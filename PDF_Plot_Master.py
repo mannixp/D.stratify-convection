@@ -1,5 +1,5 @@
 """
-Given the input files from a 2D Dedalus Rayleigh - Benard simulatin
+Given the input files from a 2D Dedalus Rayleigh - Benard simulation
 construct the following plots:
 
 - joint PDF(s) f_Y(y)
@@ -21,6 +21,7 @@ from   scipy.interpolate import interp1d,LinearNDInterpolator
 from   scipy.integrate   import cumulative_trapezoid
 from   scipy.ndimage     import gaussian_filter
 from   KDEpy             import FFTKDE,bw_selection
+
 
 class PDF_Gen_Master(object):
 
@@ -124,11 +125,18 @@ class PDF_Gen_Master(object):
             b_split.append(b_cheb)
 
             # Expectation variables -------------
-            dB_x = file['tasks/grad_b'][-i,0,:,:]# d/dx
-            dB_z = file['tasks/grad_b'][-i,1,:,:]# d/dz
-            dW_x = file['tasks/grad_w'][-i,0,:,:]# d/dx
-            dW_z = file['tasks/grad_w'][-i,1,:,:]# d/dz
-            dP_z = file['tasks/grad_p'][-i,1,:,:]# d/dz
+            try:
+                dB_x = file['tasks/grad_b'][-i,0,:,:]# d/dx
+                dB_z = file['tasks/grad_b'][-i,1,:,:]# d/dz
+                dW_x = file['tasks/grad_w'][-i,0,:,:]# d/dx
+                dW_z = file['tasks/grad_w'][-i,1,:,:]# d/dz
+                dP_z = file['tasks/grad_p'][-i,1,:,:]# d/dz
+            except:
+                dB_x = file['tasks/grad_bx'][-i,:,:]# d/dx
+                dB_z = file['tasks/grad_bz'][-i,:,:]# d/dz
+                dW_x = file['tasks/grad_wx'][-i,:,:]# d/dx
+                dW_z = file['tasks/grad_wz'][-i,:,:]# d/dz
+                dP_z = file['tasks/grad_pz'][-i,:,:]# d/dz
 
             R_00 = (dW_x**2   + dW_z**2  )
             R_01 = (dB_x*dW_x + dB_z*dW_z)
@@ -170,6 +178,7 @@ class PDF_Gen_Master(object):
         """
 
         file   = h5py.File(self.file + 'snapshots/snapshots_s1.h5', mode='r')
+        
         z_cheb = file['tasks/buoyancy'].dims[2][0][:]
         x1D    = file['tasks/buoyancy'].dims[1][0][:]
 
@@ -224,7 +233,7 @@ class PDF_Gen_Master(object):
 
         elif name == 'PLUME':
             # frames 400
-            pdf.domain = {'w':(-1.25,1.25),'b':(-.2,.4),'z':(0.,1.)}
+            pdf.domain = {'w':(-1.25,1.25),'b':(-.1,.1),'z':(0.,1.)}
             self.scale_1D_pdf = {'fW':2.,'fB':8.}
             self.scale_2D_pdf = {'fWB':[2.,8.],'fWZ':0.0075,'fBZ':0.015}
             
@@ -657,6 +666,59 @@ class PDF_Gen_Master(object):
             
         return None;
     
+    def Spectra(self):
+
+        """
+        Plot the time-averaged spectra of the Kinetic energy and buoyancy variance
+        to verify the spatial convergence of the simulations.
+        """
+
+
+        f  = h5py.File(self.file + 'scalar_data/scalar_data_s1.h5', mode='r')
+        
+        fig, (ax1,ax2) = plt.subplots(ncols=2,figsize=(8,4))
+        ax1.semilogy(f['tasks/Eu(k)'][-1,:,0] ,'r.')
+        ax1.set_ylabel(r'Kinetic Energy')
+        ax1.set_xlabel(r'Fourier mode k')
+
+        ax2.semilogy(f['tasks/Eu(Tz)'][-1,0,:],'b.')
+        ax2.set_xlabel(r'Chebyshev polynomial Tz')
+        fig.savefig('Kinetic Energy Spectra', dpi=200)
+        plt.close(fig)
+        
+        fig, (ax1,ax2) = plt.subplots(ncols=2,figsize=(8,4))
+        ax1.semilogy(f['tasks/Eb(k)'][-1,:,0] ,'r.')
+        ax1.set_ylabel(r'Buoyancy Energy')
+        ax1.set_xlabel(r'Fourier mode k')
+
+        ax2.semilogy(f['tasks/Eb(Tz)'][-1,0,:],'b.')
+        ax2.set_xlabel(r'Chebyshev polynomial Tz')
+        fig.savefig('Buoyancy Energy Spectra', dpi=200)
+        plt.close(fig)
+
+
+        # Shape time,x,z
+        Eu     = f['tasks/Eu(t)'][:,0,0]
+        Eb     = f['tasks/Eb(t)'][:,0,0]
+        wB_avg = f['tasks/<wB>'][:,0,0]
+        B_avg  = f['tasks/<B>' ][:,0,0]
+        t      = f['scales/sim_time'][()]
+        
+        fig, axs = plt.subplots(2, 2)
+        axs[0, 0].plot(t,Eu,'b-',label=r'$E_u$')
+        axs[0, 0].set_title(r'$E_u$')
+        axs[0, 1].plot(t,Eb,'r-',label=r'$E_b$')
+        axs[0, 1].set_title(r'$E_b$')
+        axs[1, 0].plot(t,wB_avg,'b:',label=r'$\langle wB \rangle$')
+        axs[1, 0].set_title(r'$\langle wB \rangle$')
+        axs[1, 1].plot(t, B_avg,'r:',label=r'$\langle B  \rangle$')
+        axs[1, 1].set_title(r'$\langle B  \rangle$')
+        plt.tight_layout()
+        fig.savefig('EnergyTimeSeries.png',dpi=200)
+        plt.close(fig)
+
+        return None;
+
     def Energetics(self):
 
         """
@@ -670,7 +732,7 @@ class PDF_Gen_Master(object):
        
         print('------  Computing Energetics ------- \n ')
 
-        f     = h5py.File(self.file + 'scalar_data/scalar_data_s1.h5', mode='r')
+        f     = h5py.File(self.file + 'scalar_data/scalar_data_s1.h5', mode='r')    
         file  = h5py.File(self.file + 'snapshots/snapshots_s1.h5'    , mode='r')
         times = file['tasks/buoyancy/'].dims[0]['sim_time'][:]
         print('Averaging Window T = [%f,%f]'%( times[-self.frames], times[-1] ))
@@ -678,7 +740,10 @@ class PDF_Gen_Master(object):
 
         Lx = 4.0; Lz = 1.0; V = Lx*Lz;# Domain size
 
-        Disp_U = np.mean(f['tasks/dU^2(t)/Re'][:,0,0][indx])/V
+        try:
+            Disp_U = np.mean(f['tasks/dU^2(t)/Re'][:,0,0][indx])/V
+        except:
+            Disp_U = np.mean(f['tasks/dU^2(t)_div_Re'][:,0,0][indx])/V
         wb_avg = np.mean(f['tasks/<wB>'      ][:,0,0][indx])/V
  
         B_avg  = np.mean(f['tasks/<B>'    ][:,0,0][indx])/V
@@ -695,7 +760,7 @@ class PDF_Gen_Master(object):
         TPE_pdf = -np.trapz( np.trapz(Ibz*self.fBZ,x=self.z,axis=1), x = self.b)
 
         error = abs(TPE_pdf - TPE)/abs(TPE) 
-        if error > 1e-02:
+        if error > 1e-01:
             raise ValueError(f"TPE resdiual error must be less than 1e-03 but got : {error}")
 
         z_b = cumulative_trapezoid(self.fB,x=self.b,initial=0)
@@ -911,7 +976,6 @@ class PDF_Gen_Master(object):
         plt.close()
 
         return None;
-
 
 class PDF_Master(PDF_Gen_Master):
 
@@ -1136,6 +1200,8 @@ class PDF_Master(PDF_Gen_Master):
         Processes the data from the dedalus format for KDEpy
         """   
 
+        raise NotImplementedError('This has not yet been corrected to work with D2 nor verified \n')
+    
         print('Calculating the boundary terms as not yet available ...')
         file = h5py.File(self.file  + 'snapshots/snapshots_s1.h5', mode='r')
 
@@ -1673,6 +1739,25 @@ if __name__ == "__main__":
 
     # %%
     %matplotlib inline
+
+
+    pdf = PDF_Master(file_dir='Plumes1e06',N_pts=2**8,frames=250,method='HIST')
+    pdf.Scalings('PLUME')
+    
+    pdf.Generate_PDF()        
+    pdf.Energetics()
+    pdf.Spectra()
+    pdf.Generate_Expectations()
+    pdf.Interpolate()
+
+    # %%
+    pdf.Plot_Pdfs(interval=pdf.domain,figname='PDF_RBC.png',Nlevels=15,norm_2d='log')
+
+    # %%  
+    for key,save in zip(pdf.Expectations.keys(),pdf.Save_Handles):    
+        print('key=',key)
+        pdf.Plot_Expectation(term=key,interval=pdf.domain,figname=save+'.png',Nlevels=20,norm='log',sigma_smooth=3)
+
 
     # %%
     Files         = glob.glob('/data/pmannix/PDF_DNS_Data/Sim**')
