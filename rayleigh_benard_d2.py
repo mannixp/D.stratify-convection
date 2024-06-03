@@ -39,11 +39,11 @@ logger = logging.getLogger(__name__)
 
 # Parameters
 Lx, Lz = 4, 1
-Nx, Nz = 512,64
-Rayleigh = 10**7
+Nx, Nz = 512,128
+Rayleigh = 10**9
 Prandtl  = 1
 
-filename = None; #"/data/pmannix/PDF_DNS_Data/RBC8_1e10/checkpoints/checkpoints_s1.h5" 
+filename ="/home/pmannix/Stratification-DNS/Plumes1e06/checkpoints/checkpoints_s1.h5" 
 
 # Create bases and domain
 start_init_time = time.time()
@@ -98,15 +98,23 @@ solver = problem.build_solver(de.timesteppers.SBDF2)
 logger.info('Solver built')
 
 # Integration parameters
-solver.stop_sim_time  = 500
-solver.stop_wall_time = 60 * 60.
+solver.stop_sim_time  = 15000 #int( Rayleigh**.5 )/2 # Fraction of a diffusive time
+solver.stop_wall_time = 24 * 60 * 60. # Stop after 24hrs
 solver.stop_iteration = np.inf
 
-if filename != None:
-    write,initial_timestep = solver.load_state(filename);
+# if filename != None:
+#     write,initial_timestep = solver.load_state(filename);
+
+# solver.sim_tim = solver.initial_sim_time = 0.
+# solver.iteration = solver.initial_iteration = 0    
+
+# # Integration parameters
+# solver.stop_sim_time = np.inf; #100
+# solver.stop_wall_time = np.inf; #60 * 60.
+# solver.stop_iteration = 1000
 
 # Analysis
-checkpoints = solver.evaluator.add_file_handler('checkpoints', sim_dt=5.)
+checkpoints = solver.evaluator.add_file_handler('checkpoints', sim_dt=500.)
 checkpoints.add_system(solver.state)
 
 # Snapshots
@@ -124,7 +132,7 @@ snapshots.add_task('wz'   , name='grad_wz',scales=1)
 snapshots.add_task('dz(p)', name='grad_pz',scales=1)
 
 # Time Series and spectra
-scalar = solver.evaluator.add_file_handler('scalar_data',iter=10, mode='overwrite')
+scalar = solver.evaluator.add_file_handler('scalar_data',sim_dt=1)
 
 scalar.add_task("integ(u**2 + w**2)",  name='Eu(t)')
 scalar.add_task("integ(b**2)"       ,  name='Eb(t)')
@@ -143,11 +151,11 @@ scalar.add_task("integ(z*b)",  name='<zB>')
 
 
 # CFL
-CFL = flow_tools.CFL(solver, initial_dt=1e-4, cadence=5, safety=0.5,max_change=1.5, min_change=0.5, max_dt=0.05)
+CFL = flow_tools.CFL(solver, initial_dt=1e-4, cadence=5, safety=0.5,max_change=1.5, min_change=0.5, max_dt=0.005)
 CFL.add_velocities(('u', 'w'))
 
 # Flow properties
-flow = flow_tools.GlobalFlowProperty(solver, cadence=10)
+flow = flow_tools.GlobalFlowProperty(solver, cadence=1000)
 
 flow.add_property("inv_Vol*integ(w*b)", name='<wB>')
 flow.add_property("nu*inv_Vol*integ( dx(u)**2 + uz**2 + dx(w)**2 + wz**2)", name='dU^2/Re')
@@ -162,7 +170,7 @@ try:
     while solver.ok:
         dt = CFL.compute_dt()
         solver.step(dt)
-        if (solver.iteration-1) % 100 == 0:
+        if (solver.iteration-1) % 1000 == 0:
             
             wB_avg = flow.volume_average('<wB>')
             dU_avg = flow.volume_average('dU^2/Re' )

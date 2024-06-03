@@ -1,5 +1,5 @@
 import numpy as np
-import os,h5py,glob,
+import os,h5py,glob
 from pyevtk.hl import gridToVTK # 
 
 def Make_VTK(DIR_ABS_PATH,OUT_FILE,time_index=-1):
@@ -72,8 +72,11 @@ if __name__ == "__main__":
     IN_FILE      = "ICR_Ra1e11_T8e04";
     #IN_FILE      = "PLUME_Ra1e9_T2e03";
 
+    PATH = "/home/pmannix/Stratification-DNS/"
+    IN_FILE      = "Plumes1e08";
 
     DIR_ABS_PATH = PATH + IN_FILE; 
     OUT_FILE     = PATH + "para_visualisation"
 
+    
     Make_VTK(DIR_ABS_PATH, OUT_FILE);

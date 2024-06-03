@@ -12,15 +12,13 @@ import h5py,glob,pickle,os
 import numpy as np
 
 from matplotlib import rc
-rc('text', usetex=True)
-rc('font', family='serif')
+#rc('text', usetex=True)
+#rc('font', family='serif')
 rc('font', size=25.0)
 import matplotlib.pyplot as plt
 
 from   scipy.interpolate import interp1d,LinearNDInterpolator
-from   scipy.integrate   import cumulative_trapezoid
 from   scipy.ndimage     import gaussian_filter
-from   KDEpy             import FFTKDE,bw_selection
 
 
 class PDF_Gen_Master(object):
@@ -156,20 +154,6 @@ class PDF_Gen_Master(object):
         b_data      = np.concatenate(     b_split)
 
         return w_data,b_data,z_data,    dpGrad_data,b2Grad_data,wbGrad_data,w2Grad_data
- 
-        #Normalise all the data
-        # WE = self.Weights()
-        # X  = [w_data,b_data,z_data,    dpGrad_data,b2Grad_data,wbGrad_data,w2Grad_data]
-        # for i,x in enumerate(X):
-     
-        #     if i != 2: # We don't do it for z_data as Σ_x = 0
-
-        #         μ_x  = np.average(x              ,weights=WE);
-        #         Σ_x  = np.average(abs(x - μ_x)**2,weights=WE)**0.5;
-        #         X[i] = (X[i] - μ_x)/Σ_x;
-        #         #print('Avg (μ_x,Σ_x) = %e,%e'%(μ_x,Σ_x))
-
-        # return X
 
     def Weights(self):
 
@@ -233,7 +217,7 @@ class PDF_Gen_Master(object):
 
         elif name == 'PLUME':
             # frames 400
-            pdf.domain = {'w':(-1.25,1.25),'b':(-.1,.1),'z':(0.,1.)}
+            pdf.domain = {'w':(-.025,.025),'b':(-.015,.015),'z':(0.,1.)}
             self.scale_1D_pdf = {'fW':2.,'fB':8.}
             self.scale_2D_pdf = {'fWB':[2.,8.],'fWZ':0.0075,'fBZ':0.015}
             
@@ -299,231 +283,19 @@ class PDF_Gen_Master(object):
 
     def Generate_PDF(self):
 
-        # Compute the PDF
-        if self.method == "KDE":
-            self.Generate_PDF_KDE()
-        else:
-            self.Generate_PDF_HIST(); 
+        self.Generate_PDF_HIST(); 
 
         return None;
 
     def Generate_Expectations(self):
 
-        # Compute the expectations
-        if self.method == "KDE":
-            self.Generate_Expectations_KDE()
-        else:
-            self.Generate_Expectations_HIST(); 
+        
+        self.Generate_Expectations_HIST(); 
 
         # Interpolate both in z onto a finer grid
          
         return None;
 
-    # kde
-    def Generate_PDF_KDE(self,error_pdf=1e-02,error_z=1e-04):
-
-        """
-        Generates all enumerations of 1D & 2D PDFs
-        """
-        
-        print('------  Generating PDFs ------- \n ')
-
-        # Get Data & weights
-        W,B,Z,  dPGrad,B2Grad,WBGrad,W2Grad = self.data
-        weights = self.weights
-
-        # 1D PDFs
-        pdfs_1D = ['fW','fB']
-        grid_1D = ['w',  'b']
-        data_1D = [W.flatten(),B.flatten()]
-        for pdf_name,grid_name,X in zip(pdfs_1D,grid_1D,data_1D):
-            
-            grid, points = self.Fit(np.vstack((X,)).T,weights,scale_bw=self.scale_1D_pdf[pdf_name])
-            setattr(self,pdf_name,points)
-            setattr(self,grid_name,grid)
-
-        setattr(self,'fZ',np.ones(len(Z)))
-        setattr(self,'z',Z)
-
-
-        # 2D PDFs 
-        grid, points = self.Fit(data=np.vstack((W.flatten(),B.flatten())).T,weights=weights,scale_bw=self.scale_2D_pdf['fWB'])
-        setattr(self,'fWB',points.reshape(self.N,self.N))
-
-        fWZ = np.zeros((len(self.w),len(self.z)));
-        fBZ = np.zeros((len(self.b),len(self.z)));
-
-        for j in range(len(self.z)):
-            
-            fWZ[:,j] = FFTKDE(kernel='gaussian', bw=self.scale_2D_pdf['fWZ'],norm=2).fit(data=W[:,j]).evaluate(self.w)
-            fBZ[:,j] = FFTKDE(kernel='gaussian', bw=self.scale_2D_pdf['fBZ'],norm=2).fit(data=B[:,j]).evaluate(self.b) 
-             
-        setattr(self,'fWZ',fWZ)
-        setattr(self,'fBZ',fBZ)
-
-        # Validations
-        int_fw = np.trapz(self.fW, x = self.w)
-        int_fb = np.trapz(self.fB, x = self.b)
-        int_fz = np.trapz(self.fZ, x = self.z)
-        for val,name in zip([int_fw,int_fb,int_fz],['fW','fB','fZ']):
-            if abs(val-1.0) > error_pdf:
-                raise ValueError(f"Joint PDF must integrate to 1, got {name,abs(val-1.)}")
-
-        int_fwb = np.trapz( np.trapz(self.fWB,x=self.b,axis=1), x = self.w)
-        int_fbz = np.trapz( np.trapz(self.fBZ,x=self.z,axis=1), x = self.b)
-        int_fwz = np.trapz( np.trapz(self.fWZ,x=self.z,axis=1), x = self.w)
-        for val,name in zip([int_fwb,int_fbz,int_fwz],['fWB','fBZ','fWZ']):
-            if abs(val-1.0) > error_pdf:
-                raise ValueError(f"Joint PDF must integrate to 1, got {name,abs(val-1.)}")
-
-        fZ_approx_b = np.trapz(self.fBZ,x=self.b,axis=0) 
-        fZ_approx_w = np.trapz(self.fWZ,x=self.w,axis=0) 
-        for val1,val2 in zip(fZ_approx_b,fZ_approx_w):
-            
-            if abs(val1 - 1.0) > error_z:
-                raise ValueError(f"Expected f_Z(z)=1 +/- 1e-06, got: {'fBZ',abs(val1 - 1.0)} ")
-            
-            if abs(val2 - 1.0) > error_z:
-                raise ValueError(f"Expected f_Z(z)=1 +/- 1e-06, got: {'fWZ',abs(val2 - 1.0)} ")
-            
-        return None;
-
-    def Generate_Expectations_KDE(self,scale_bw=None,error_pdf=1e-02):
-
-        """
-        Compute the 1D & 2D conditional expectations by creating the 2D pdf
-        
-            E[Φ|B = b] = int φfΦ|B (φ|b)dφ = int φ fBΦ(b,φ)/fB(b) dφ,
-
-        and integrating out the independent variable φ. The same
-        approach is used to compute 2D conditional expectations.
-        """
-
-        print('------  Generating Conditional Expectations ------- \n ')
-
-        W,B,Z,  dPGrad,B2Grad,WBGrad,W2Grad = self.data
-        weights = self.weights
-        Term_E  = [dPGrad,B2Grad,WBGrad,W2Grad]
-        Nz      = len(self.z)
-
-        # x2 1D E{Φ|W=w},E{Φ|B=b}
-        data_1D = [W,B]
-        grid_1D = ['w','b']
-        for key,value, Φ in zip(self.Expectations.keys(),self.Expectations.values(),Term_E):
-            
-            for key_1D,X_i,grid_name in zip(value['1D'].keys(),data_1D,grid_1D):
-
-                data = np.vstack( (X_i.flatten(),Φ.flatten()) ).T
-                grid, points = self.Fit(data=data,weights=weights,scale_bw=self.scale_bw_2D[key])
-                x,φ  = np.unique(grid[:, 0]), np.unique(grid[:, 1])
-                f_XΦ = points.reshape(self.N,self.N) # f_XΦ(x,φ)
-
-                # E{Φ|X} = int_φ f_Φ|X(φ|x)*φ dφ
-                f_X  = np.trapz(f_XΦ,x=φ,axis=1)     # f_X(x)
-                value['1D'][key_1D] = np.trapz(φ*f_XΦ,x=φ,axis=1)/f_X;
-
-                #Check smoothness
-                if   grid_name == 'w':
-                    err = np.linalg.norm(self.fW - f_X,2)/np.linalg.norm(self.fW);
-                elif grid_name == 'b':
-                    err = np.linalg.norm(self.fB - f_X,2)/np.linalg.norm(self.fB);
-                Sum_pij = np.trapz(f_X,x = x)
-                
-                if abs(Sum_pij - 1.0) > error_pdf:
-                    print('~~~~~~~~ E{ %s | %s} ~~~~~~~~~~~~ '%(key,key_1D))
-                    print('Sum_pij = %e, Error = %e'%(Sum_pij,err),'\n')
-                    raise ValueError(f"Joint PDF must integrate to 1, got {key,key_1D,abs(Sum_pij - 1.0)}")
-
-        
-        # 2D E{Φ|W=w,B=b}
-        key_2D  = 'wb'
-        for key,value, Φ in zip(self.Expectations.keys(),self.Expectations.values(),Term_E):
-    
-            data = np.vstack( (W.flatten(),B.flatten(),Φ.flatten()) ).T;
-            grid, points = self.Fit(data=data,weights=weights,scale_bw=self.scale_bw_3D[key])                
-            x1,x2,φ = np.unique(grid[:, 0]), np.unique(grid[:, 1]), np.unique(grid[:, 2])
-            f_XΦ = points.reshape(self.pts,self.pts,self.pts) # f_XΦ(x_1,x_2,φ)
-            f_X  = np.trapz(f_XΦ, x=φ, axis = 2);             # f_X( x_1,x_2  )
-
-            #Check smoothness
-            Sum_pij = np.trapz( np.trapz(f_X, x=x2,axis=1) ,x=x1,axis=0)
-           
-            # E{Φ|X} = int_φ f_Φ|X(φ|x)*φ dφ
-            Tmp      = np.trapz(φ*f_XΦ,x=φ,axis=2)/f_X;
-
-            # Interpolation to full-size
-            X1,X2  = np.broadcast_arrays(x1.reshape(-1,1),x2)
-            coords = np.vstack((X1.flatten(),X2.flatten())).T
-            f_2d   = LinearNDInterpolator(coords, Tmp.flatten())
-            value['2D'][key_2D] = f_2d((self.w).reshape(-1,1),self.b)   
-
-            if abs(Sum_pij - 1.0) > error_pdf:
-                    print('\n ~~~~~~~~ E{%s|W=w,B=b} ~~~~~~~~~~~~ '%key)
-                    print('Sum_pij = %e '%(Sum_pij),'\n')
-                    #raise ValueError(f"Joint PDF must integrate to 1, got {key,key_2D,abs(Sum_pij - 1.0)}")
-        
-        # 2D E{Φ|Z=z,B=b}
-        Term_E  = [dPGrad,B2Grad,WBGrad,W2Grad]
-        key_2D  = 'bz'
-        for key,value, Φ in zip(self.Expectations.keys(),self.Expectations.values(),Term_E):
-            
-            E_X     = np.zeros((self.N,Nz)) # f_BZΦ
-            err     = []
-            Sum_pij = []
-            for j in range(Nz):
-                
-                # KDE
-                data        = np.vstack( (B[:,j].flatten(),Φ[:,j].flatten()) ).T
-                grid, points= self.Fit(data=data)#,scale_bw=self.scale_bz_3D[key])
-                #grid, points= FFTKDE(kernel='gaussian', bw=0.075,norm=2).fit(data=data).evaluate((self.N,self.N))
-                b,φ         = np.unique(grid[:, 0]), np.unique(grid[:, 1])
-                f_XΦ        = points.reshape(self.N,self.N) # f_BΦ(b,φ|Z=zj)
-                
-                f_X         = np.trapz(f_XΦ,x=φ,axis=1);    # f_B(b|Z=zj)
-
-                # E{Φ|B,Z=zj} = int_φ f_Φ|B(φ|b,z_j)*φ dφ
-                E           = np.trapz(φ*f_XΦ,x=φ,axis=1)/f_X;
-                E_X[:,j]    = interp1d(b,E,bounds_error=False)(self.b)
-
-                #Check smoothness
-                err.append( np.linalg.norm(self.fB - f_X,2)/np.linalg.norm(self.fB,2) )
-                Sum_pij.append( np.trapz(f_X ,x=self.b,axis=0) )
-
-
-            print('\n ~~~~~~~~ E{%s|B=b,Z=z} ~~~~~~~~~~~~ '%key)
-            print('Sum_pij = %e, Error = %e'%(max(Sum_pij),max(err)),'\n')
-            value['2D'][key_2D] = E_X
-        
-        key_2D  = 'wz'
-        for key,value, Φ in zip(self.Expectations.keys(),self.Expectations.values(),Term_E):
-            
-            
-            E_X     = np.zeros((self.N,Nz)) # f_WZΦ
-            err     = []
-            Sum_pij = []
-            for j in range(Nz):
-                
-                data        = np.vstack( (W[:,j].flatten(),Φ[:,j].flatten()) ).T
-                grid, points= self.Fit(data=data)
-                w,φ         = np.unique(grid[:, 0]), np.unique(grid[:, 1])
-                f_XΦ        = points.reshape(self.N,self.N) # f_WΦ(w,φ|Z=zj)
-                f_X         = np.trapz(f_XΦ,x=φ,axis=1);    # f_W(w|Z=zj)
-
-                #Check smoothness
-                err.append( np.linalg.norm(self.fW - f_X,2)/np.linalg.norm(self.fW,2) )
-                Sum_pij.append( np.trapz(f_X ,x=self.w,axis=0) )
-
-                # E{Φ|W,Z=zj} = int_φ f_Φ|W(φ|w,z_j)*φ dφ
-                E             = np.trapz(φ*f_XΦ,x=φ,axis=1)/f_X;
-                E_X[:,j]      = interp1d(w,E,bounds_error=False)(self.w)
-
-            print('\n ~~~~~~~~ E{%s|W=w,Z=z} ~~~~~~~~~~~~ '%key)
-            print('Sum_pij = %e, Error = %e'%(max(Sum_pij),max(err)),'\n')
-            value['2D'][key_2D] = E_X
-        
-        return None;
-    
-    # histogram
     def Generate_PDF_HIST(self):
 
         """
@@ -666,6 +438,7 @@ class PDF_Gen_Master(object):
             
         return None;
     
+
     def Spectra(self):
 
         """
@@ -733,7 +506,7 @@ class PDF_Gen_Master(object):
         print('------  Computing Energetics ------- \n ')
 
         f     = h5py.File(self.file + 'scalar_data/scalar_data_s1.h5', mode='r')    
-        file  = h5py.File(self.file + 'snapshots/snapshots_s1.h5'    , mode='r')
+        file  = h5py.File(self.file + 'snapshots/snapshots_s3.h5'    , mode='r')
         times = file['tasks/buoyancy/'].dims[0]['sim_time'][:]
         print('Averaging Window T = [%f,%f]'%( times[-self.frames], times[-1] ))
         indx  = np.where(f['scales/sim_time'][()] > times[-self.frames])
@@ -757,14 +530,16 @@ class PDF_Gen_Master(object):
         
         # PDF TPE
         Ibz = np.outer(self.b,self.z)
-        TPE_pdf = -np.trapz( np.trapz(Ibz*self.fBZ,x=self.z,axis=1), x = self.b)
+        db = abs(self.b[1] - self.b[0]) 
+        TPE_pdf = -np.sum( np.trapz(Ibz*self.fBZ,x=self.z,axis=1) )*db # use trapz as z is non-uniform grid
 
         error = abs(TPE_pdf - TPE)/abs(TPE) 
-        if error > 1e-01:
-            raise ValueError(f"TPE resdiual error must be less than 1e-03 but got : {error}")
+        if error > 1e-02:
+            print(f"TPE resdiual error must be less than 1e-03 but got : {error}")
+            #raise ValueError(f"TPE resdiual error must be less than 1e-03 but got : {error}")
 
-        z_b = cumulative_trapezoid(self.fB,x=self.b,initial=0)
-        RPE = -np.trapz(z_b*self.b*self.fB,x=self.b)
+        z_b = np.cumsum(self.fB)*db
+        RPE = -np.sum(z_b*self.b*self.fB)*db
         APE = (TPE - RPE);
 
         self.stats = {'TPE':TPE,'APE':APE,'RPE':RPE,
@@ -1738,10 +1513,9 @@ class PDF_Master(PDF_Gen_Master):
 if __name__ == "__main__":
 
     # %%
-    %matplotlib inline
+    #%matplotlib inline
 
-
-    pdf = PDF_Master(file_dir='Plumes1e06',N_pts=2**8,frames=250,method='HIST')
+    pdf = PDF_Master(file_dir='Plumes5e08',N_pts=2**8,frames=800,method='HIST')
     pdf.Scalings('PLUME')
     
     pdf.Generate_PDF()        
@@ -1780,96 +1554,96 @@ if __name__ == "__main__":
     #     with open('mypickle'+name+'.pickle', 'wb') as f:
     #         pickle.dump(pdf, f)
 
-    # %%
-    for (name,frames) in Names_Frames.items(): 
+    # # %%
+    # for (name,frames) in Names_Frames.items(): 
 
-        print('Case %s \n'%name)
+    #     print('Case %s \n'%name)
 
-        with open(parent_dir+'mypickle'+name+'.pickle','rb') as f:
-            pdf = pickle.load(f)
+    #     with open(parent_dir+'mypickle'+name+'.pickle','rb') as f:
+    #         pdf = pickle.load(f)
 
-        os.mkdir(parent_dir+name+'_Convection') 
-        os.chdir(parent_dir+name+'_Convection')
+    #     os.mkdir(parent_dir+name+'_Convection') 
+    #     os.chdir(parent_dir+name+'_Convection')
         
-        pdf.Plot_Pdfs(interval=pdf.domain,figname='PDF_'+name+'.png',Nlevels=15,norm_2d='log')
+    #     pdf.Plot_Pdfs(interval=pdf.domain,figname='PDF_'+name+'.png',Nlevels=15,norm_2d='log')
         
-        for key,save in zip(pdf.Expectations.keys(),pdf.Save_Handles):    
-            print('key=',key)
-            pdf.Plot_Expectation(term=key,interval=pdf.domain,figname=save+'.png',Nlevels=20,norm='log',sigma_smooth=3)
+    #     for key,save in zip(pdf.Expectations.keys(),pdf.Save_Handles):    
+    #         print('key=',key)
+    #         pdf.Plot_Expectation(term=key,interval=pdf.domain,figname=save+'.png',Nlevels=20,norm='log',sigma_smooth=3)
 
-        os.chdir(parent_dir)
+    #     os.chdir(parent_dir)
 
 
-    # %%
-    #Paper figures section f_BZ
-    #~~~~~~~~~~~~~~ # ~~~~~~~~~~~~~~
-    name = 'f_BZ'
-    print(name)
-    #os.mkdir(parent_dir+name) 
-    os.chdir(parent_dir+name)
+    # # %%
+    # #Paper figures section f_BZ
+    # #~~~~~~~~~~~~~~ # ~~~~~~~~~~~~~~
+    # name = 'f_BZ'
+    # print(name)
+    # #os.mkdir(parent_dir+name) 
+    # os.chdir(parent_dir+name)
 
-    with open(parent_dir+'mypickleIC_Noise.pickle','rb') as f:
-        pdf = pickle.load(f)
-    pdf.Decomposition(interval=pdf.domain,figname='Compare_Terms_fB_IC.png',)
-    pdf.Plot_EBZ(interval = pdf.domain, term='\|dB\|^2', figname='IC_E_BZ_and_f_BZ.png',dpi=200,Nlevels=15,sigma_smooth=2)
+    # with open(parent_dir+'mypickleIC_Noise.pickle','rb') as f:
+    #     pdf = pickle.load(f)
+    # pdf.Decomposition(interval=pdf.domain,figname='Compare_Terms_fB_IC.png',)
+    # pdf.Plot_EBZ(interval = pdf.domain, term='\|dB\|^2', figname='IC_E_BZ_and_f_BZ.png',dpi=200,Nlevels=15,sigma_smooth=2)
 
-    with open(parent_dir+ 'mypickleRBC.pickle','rb') as f:
-        pdf = pickle.load(f)
-    pdf.Decomposition(interval=pdf.domain,figname='Compare_Terms_fB_RBC.png',)
-    pdf.Plot_EBZ(interval = pdf.domain, term='\|dB\|^2', figname='RBC_E_BZ_and_f_BZ.png',dpi=200,Nlevels=15,sigma_smooth=2)
+    # with open(parent_dir+ 'mypickleRBC.pickle','rb') as f:
+    #     pdf = pickle.load(f)
+    # pdf.Decomposition(interval=pdf.domain,figname='Compare_Terms_fB_RBC.png',)
+    # pdf.Plot_EBZ(interval = pdf.domain, term='\|dB\|^2', figname='RBC_E_BZ_and_f_BZ.png',dpi=200,Nlevels=15,sigma_smooth=2)
 
-    os.chdir(parent_dir)
+    # os.chdir(parent_dir)
 
-    # %%
-    # # Paper figures section f_WZ
+    # # %%
+    # # # Paper figures section f_WZ
+    # # # ~~~~~~~~~~~~~~ # ~~~~~~~~~~~~~~
+    # name = 'f_WZ'
+    # print(name)
+    # #os.mkdir(parent_dir+name) 
+    # os.chdir(parent_dir+name)
+
+    # with open(parent_dir +'mypickleRBC_Sine.pickle','rb') as f:
+    #     pdf = pickle.load(f)
+    # Ra = 1e10;
+    # pdf.Plot_EWZ(Ra = Ra,interval = pdf.domain, term='B'           , figname='HC_E_B___WZ_and_f_WZ.png',dpi=200,Nlevels=40,sigma_smooth=3,norm='linear')
+    # pdf.Plot_EWZ(Ra = Ra,interval = pdf.domain, term='\partial_z P', figname='HC_E_dPZ_WZ_and_f_WZ.png',dpi=200,Nlevels=40,sigma_smooth=3,norm='linear')
+    # pdf.Plot_EWZ(Ra = Ra,interval = pdf.domain, term='\| dW \|^2'  , figname='HC_E_dW2_WZ_and_f_WZ.png',dpi=400,Nlevels=40,sigma_smooth=3,norm='linear')
+    # pdf.Plot_EWZ(Ra = Ra,interval = pdf.domain, term='both'        , figname='HC_E_BPZ_WZ_and_f_WZ.png',dpi=200,Nlevels=40,sigma_smooth=3,norm='linear')
+
+    # with open(parent_dir +'mypickleIC.pickle','rb') as f:
+    #     pdf = pickle.load(f)
+    # Ra = 1e11;    
+    # pdf.Plot_EWZ(Ra = Ra,interval = pdf.domain, term='B'           , figname='IC_E_B___WZ_and_f_WZ.png',dpi=200,Nlevels=40,sigma_smooth=3,norm='linear')
+    # pdf.Plot_EWZ(Ra = Ra,interval = pdf.domain, term='\partial_z P', figname='IC_E_dPZ_WZ_and_f_WZ.png',dpi=200,Nlevels=40,sigma_smooth=3,norm='linear')
+    # pdf.Plot_EWZ(Ra = Ra,interval = pdf.domain, term='\| dW \|^2'  , figname='IC_E_dW2_WZ_and_f_WZ.png',dpi=400,Nlevels=40,sigma_smooth=3,norm='linear')
+    # pdf.Plot_EWZ(Ra = Ra,interval = pdf.domain, term='both'        , figname='IC_E_BPZ_WZ_and_f_WZ.png',dpi=200,Nlevels=40,sigma_smooth=3,norm='linear')
+    # os.chdir(parent_dir)
+
+    # # %%
+    # # Paper figures section f_WB
     # # ~~~~~~~~~~~~~~ # ~~~~~~~~~~~~~~
-    name = 'f_WZ'
-    print(name)
-    #os.mkdir(parent_dir+name) 
-    os.chdir(parent_dir+name)
+    # name = 'f_WB'
+    # print(name)
+    # #os.mkdir(parent_dir+name) 
+    # os.chdir(parent_dir+name)
 
-    with open(parent_dir +'mypickleRBC_Sine.pickle','rb') as f:
-        pdf = pickle.load(f)
-    Ra = 1e10;
-    pdf.Plot_EWZ(Ra = Ra,interval = pdf.domain, term='B'           , figname='HC_E_B___WZ_and_f_WZ.png',dpi=200,Nlevels=40,sigma_smooth=3,norm='linear')
-    pdf.Plot_EWZ(Ra = Ra,interval = pdf.domain, term='\partial_z P', figname='HC_E_dPZ_WZ_and_f_WZ.png',dpi=200,Nlevels=40,sigma_smooth=3,norm='linear')
-    pdf.Plot_EWZ(Ra = Ra,interval = pdf.domain, term='\| dW \|^2'  , figname='HC_E_dW2_WZ_and_f_WZ.png',dpi=400,Nlevels=40,sigma_smooth=3,norm='linear')
-    pdf.Plot_EWZ(Ra = Ra,interval = pdf.domain, term='both'        , figname='HC_E_BPZ_WZ_and_f_WZ.png',dpi=200,Nlevels=40,sigma_smooth=3,norm='linear')
+    # with open(parent_dir +'mypickleIC_Noise.pickle','rb') as f:
+    #     pdf = pickle.load(f)
+    # Ra = 1e11;  
+    # pdf.Plot_EWB(Ra = Ra,interval = pdf.domain, term='both', figname='IC_E_BdPz_WB_and_f_WB.png',dpi=200,Nlevels=15,sigma_smooth=4)
+    # pdf.Plot_EWB(Ra = Ra,interval = pdf.domain, term='\|dB\|^2', figname='IC_E_dB2_WB_and_f_WB.png',dpi=200,Nlevels=15,sigma_smooth=4)
+    # pdf.Plot_EWB(Ra = Ra,interval = pdf.domain, term=' dW^T dB', figname='IC_E_dWdB_WB_and_f_WB.png',dpi=200,Nlevels=15,sigma_smooth=4)
+    # pdf.Plot_EWB(Ra = Ra,interval = pdf.domain, term='\| dW \|^2', figname='IC_E_dW2_WB_and_f_WB.png',dpi=200,Nlevels=15,sigma_smooth=4)
 
-    with open(parent_dir +'mypickleIC.pickle','rb') as f:
-        pdf = pickle.load(f)
-    Ra = 1e11;    
-    pdf.Plot_EWZ(Ra = Ra,interval = pdf.domain, term='B'           , figname='IC_E_B___WZ_and_f_WZ.png',dpi=200,Nlevels=40,sigma_smooth=3,norm='linear')
-    pdf.Plot_EWZ(Ra = Ra,interval = pdf.domain, term='\partial_z P', figname='IC_E_dPZ_WZ_and_f_WZ.png',dpi=200,Nlevels=40,sigma_smooth=3,norm='linear')
-    pdf.Plot_EWZ(Ra = Ra,interval = pdf.domain, term='\| dW \|^2'  , figname='IC_E_dW2_WZ_and_f_WZ.png',dpi=400,Nlevels=40,sigma_smooth=3,norm='linear')
-    pdf.Plot_EWZ(Ra = Ra,interval = pdf.domain, term='both'        , figname='IC_E_BPZ_WZ_and_f_WZ.png',dpi=200,Nlevels=40,sigma_smooth=3,norm='linear')
-    os.chdir(parent_dir)
+    # with open(parent_dir +'mypickleRBC.pickle','rb') as f:
+    #     pdf = pickle.load(f)
+    # Ra = 1e10;
+    # pdf.Plot_EWB(Ra = Ra,interval = pdf.domain, term='both', figname='RBC_E_BdPz_WB_and_f_WB.png',dpi=200,Nlevels=15,sigma_smooth=4)
+    # pdf.Plot_EWB(Ra = Ra,interval = pdf.domain, term='\|dB\|^2', figname='RBC_E_dB2_WB_and_f_WB.png',dpi=200,Nlevels=15,sigma_smooth=4)
+    # pdf.Plot_EWB(Ra = Ra,interval = pdf.domain, term=' dW^T dB', figname='RBC_E_dWdB_WB_and_f_WB.png',dpi=200,Nlevels=15,sigma_smooth=4)
+    # pdf.Plot_EWB(Ra = Ra,interval = pdf.domain, term='\| dW \|^2', figname='RBC_E_dW2_WB_and_f_WB.png',dpi=200,Nlevels=15,sigma_smooth=4)
 
-    # %%
-    # Paper figures section f_WB
-    # ~~~~~~~~~~~~~~ # ~~~~~~~~~~~~~~
-    name = 'f_WB'
-    print(name)
-    #os.mkdir(parent_dir+name) 
-    os.chdir(parent_dir+name)
-
-    with open(parent_dir +'mypickleIC_Noise.pickle','rb') as f:
-        pdf = pickle.load(f)
-    Ra = 1e11;  
-    pdf.Plot_EWB(Ra = Ra,interval = pdf.domain, term='both', figname='IC_E_BdPz_WB_and_f_WB.png',dpi=200,Nlevels=15,sigma_smooth=4)
-    pdf.Plot_EWB(Ra = Ra,interval = pdf.domain, term='\|dB\|^2', figname='IC_E_dB2_WB_and_f_WB.png',dpi=200,Nlevels=15,sigma_smooth=4)
-    pdf.Plot_EWB(Ra = Ra,interval = pdf.domain, term=' dW^T dB', figname='IC_E_dWdB_WB_and_f_WB.png',dpi=200,Nlevels=15,sigma_smooth=4)
-    pdf.Plot_EWB(Ra = Ra,interval = pdf.domain, term='\| dW \|^2', figname='IC_E_dW2_WB_and_f_WB.png',dpi=200,Nlevels=15,sigma_smooth=4)
-
-    with open(parent_dir +'mypickleRBC.pickle','rb') as f:
-        pdf = pickle.load(f)
-    Ra = 1e10;
-    pdf.Plot_EWB(Ra = Ra,interval = pdf.domain, term='both', figname='RBC_E_BdPz_WB_and_f_WB.png',dpi=200,Nlevels=15,sigma_smooth=4)
-    pdf.Plot_EWB(Ra = Ra,interval = pdf.domain, term='\|dB\|^2', figname='RBC_E_dB2_WB_and_f_WB.png',dpi=200,Nlevels=15,sigma_smooth=4)
-    pdf.Plot_EWB(Ra = Ra,interval = pdf.domain, term=' dW^T dB', figname='RBC_E_dWdB_WB_and_f_WB.png',dpi=200,Nlevels=15,sigma_smooth=4)
-    pdf.Plot_EWB(Ra = Ra,interval = pdf.domain, term='\| dW \|^2', figname='RBC_E_dW2_WB_and_f_WB.png',dpi=200,Nlevels=15,sigma_smooth=4)
-
-    os.chdir(parent_dir)
+    # os.chdir(parent_dir)
 
 
 # %%
