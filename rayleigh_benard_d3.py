@@ -28,22 +28,26 @@ logger = logging.getLogger(__name__)
 
 # Parameters
 Lx, Lz = 4, 1
-Nx, Nz = 256,64
-Rayleigh = 10**6
+Nx, Nz = 1024,192
+Rayleigh = 10**9
 Prandtl = 1
 dealias = 3/2
-stop_sim_time = 250
-timestepper = d3.MCNAB2
-max_timestep = 0.1
+stop_sim_time = 10**3
+timestepper = d3.SBDF2
+max_timestep = 1.25e-04
 dtype = np.float64
 
-type = 'RBC'; filename = None; #"/data/pmannix/PDF_DNS_Data/RBC8_1e10/checkpoints/checkpoints_s1.h5" 
-#type = 'IC'; filename = "/data/pmannix/PDF_DNS_Data/IC8_1e11/checkpoints/checkpoints_s1.h5"
-#type = 'HC'; filename = "/home/pmannix/Dstratify/DNS_RBC/HC_Ra1e10_T2e04_old/checkpoints/checkpoints_s1.h5"
-#type = 'PLUME'; filename = "/home/pmannix/Dstratify/DNS_RBC/PLUME_Ra1e9_T4e03/checkpoints/checkpoints_s1.h5"
+Nx, Nz = 32,16
+Rayleigh = 10**3
+stop_sim_time = 50
+timestepper = d3.SBDF2
+max_timestep = 1e-03
+
+#type = 'RBC'; filename = None#"/data/pmannix/PDF_DNS_Data/Sim_RBC_Ra1e10/checkpoints/checkpoints_s1.h5" 
+#type = 'SINE'; filename = "/home/pmannix/Dstratify/DNS_RBC/HC_Ra1e10_T2e04_old/checkpoints/checkpoints_s1.h5"
 #type = 'STEP'; filename = "/home/pmannix/Dstratify/DNS_RBC/STEP_Ra1e9_T4e03/checkpoints/checkpoints_s1.h5"
 #type = 'IC_Random'; filename = "/home/pmannix/Dstratify/DNS_RBC/ICR_Ra1e11_T4e04/checkpoints/checkpoints_s1.h5"
-
+type = 'IC'; filename = None #"/data/pmannix/PDF_DNS_Data/IC8_1e11/checkpoints/checkpoints_s1.h5"
 
 # Bases
 coords = d3.CartesianCoordinates('x', 'z')
@@ -73,10 +77,6 @@ grad_b = d3.grad(b) + ez*lift(tau_b1) # First-order reduction
 
 def boundary_data(type='RBC'):
     
-    # Costant-Flux
-    #problem.add_equation("db_z(z=0)  = -1")
-    #problem.add_equation("db_z(z=Lz) = -1")
-
     if type == 'RBC':
 
         # Rayleigh Benard Convection
@@ -107,7 +107,7 @@ def boundary_data(type='RBC'):
         b['g'] *= z * (Lz - z) # Damp noise at walls
         b['g'] += z*(1- z)/2. # Add background
 
-    elif type == 'HC':
+    elif type == 'SINE':
 
         # Horizontal Convection
         
@@ -116,21 +116,6 @@ def boundary_data(type='RBC'):
 
         g_0      = dist.Field(name='g_0',bases=xbasis)
         g_0['g'] = np.sin((2.*np.pi/Lx)*x)
-
-        # Initial conditions
-        b.fill_random('g', seed=42, distribution='normal', scale=1e-3) # Random noise
-        b['g'] *= z * (Lz - z) # Damp noise at walls
-
-    elif type == 'PLUME':
-        
-        # Plume convection
-        lim_n = 10.
-
-        g_1      = dist.Field(name='g_1',bases=xbasis)
-        g_1['g'] =-np.sqrt(lim_n**2/(.5*np.pi))*np.exp(-0.5*(lim_n**2)*(x - 0.75*Lx)**2)
-
-        g_0      = dist.Field(name='g_0',bases=xbasis)
-        g_0['g'] = np.sqrt(lim_n**2/(.5*np.pi))*np.exp(-0.5*(lim_n**2)*(x - 0.25*Lx)**2)
 
         # Initial conditions
         b.fill_random('g', seed=42, distribution='normal', scale=1e-3) # Random noise
@@ -165,6 +150,7 @@ problem.add_equation("u(z=Lz)  = 0") # no-slip
 problem.add_equation("integ(p) = 0") # Pressure gauge
 
 if type == 'IC':
+    
     problem.add_equation("dt(b) - kappa*div(grad_b) + lift(tau_b2) = -u@grad(b) + kappa")
 elif type == 'IC_Random':
 
@@ -176,6 +162,7 @@ elif type == 'IC_Random':
 
     problem.add_equation("dt(b) - kappa*div(grad_b) + lift(tau_b2) = -u@grad(b) + kappa*q")
 else:
+    
     problem.add_equation("dt(b) - kappa*div(grad_b) + lift(tau_b2) = -u@grad(b)")
 
 g_1, g_0 = boundary_data(type=type)
@@ -184,19 +171,20 @@ problem.add_equation("b(z=0 ) = g_0")
 
 # Solver
 solver = problem.build_solver(timestepper)
-solver.stop_sim_time = stop_sim_time
+#solver.stop_sim_time = stop_sim_time
 
 if filename != None:
     write,initial_timestep = solver.load_state(filename);
-#solver.iteration=0
-#solver.stop_iteration=1000; #int(stop_sim_time/max_timestep)
+
+solver.iteration=0
+solver.stop_iteration=stop_sim_time*int(1/max_timestep)
 
 # Analysis
-checkpoints = solver.evaluator.add_file_handler('checkpoints', sim_dt=5.)
+checkpoints = solver.evaluator.add_file_handler('checkpoints', sim_dt=10,)
 checkpoints.add_tasks(solver.state)
 
 # Snapshots
-snapshots = solver.evaluator.add_file_handler('snapshots', sim_dt=.1)
+snapshots = solver.evaluator.add_file_handler('snapshots', sim_dt=1)
 
 snapshots.add_task(-d3.div(d3.skew(u)), name='vorticity',scales=1)
 snapshots.add_task(b,    name='buoyancy',scales=1)
@@ -207,7 +195,7 @@ snapshots.add_task(d3.grad(u@ez), name='grad_w',scales=1)
 snapshots.add_task(d3.grad(p)   , name='grad_p',scales=1)
 
 # Time Series and spectra
-scalar = solver.evaluator.add_file_handler('scalar_data',iter=10)
+scalar = solver.evaluator.add_file_handler('scalar_data',sim_dt=1)
 
 scalar.add_task(d3.Integrate(u@u ),  layout='g', name='Eu(t)')
 scalar.add_task(d3.Integrate(b**2),  layout='g', name='Eb(t)')
@@ -231,22 +219,20 @@ CFL = d3.CFL(solver, initial_dt=max_timestep, cadence=10, safety=0.35, threshold
 CFL.add_velocity(u)
 
 # Flow properties
-flow = d3.GlobalFlowProperty(solver, cadence=100)
+flow = d3.GlobalFlowProperty(solver, cadence=10**3)
 
 flow.add_property(d3.Integrate((u@ez)*b)     , name='<wB>')
 flow.add_property(nu*d3.Integrate(d3.grad(u@ez)@d3.grad(u@ez) + d3.grad(u@ex)@d3.grad(u@ex)), name='dU^2/Re')
 flow.add_property(d3.Integrate(b)            , name='<B>' )
 flow.add_property(d3.Integrate(grad_b@grad_b), name='dB^2')
 
-
 # Main loop
-startup_iter = 10
 try:
     logger.info('Starting main loop')
     while solver.proceed:
         timestep = CFL.compute_timestep()
         solver.step(timestep)
-        if (solver.iteration-1) % 100 == 0:
+        if (solver.iteration-1) % 1000 == 0:
 
             wB_avg = flow.grid_average('<wB>')
             dU_avg = flow.grid_average('dU^2/Re' )

@@ -1,12 +1,14 @@
 from matplotlib import rc
-#rc('text', usetex=True)
-#rc('font', family='serif')
-rc('font', size=25.0)
+rc('text', usetex=True)
+rc('font', family='serif')
+rc('font', size=16.0)
 
 import matplotlib.pyplot as plt
-import h5py, warnings
-import numpy as np
+import h5py, warnings, glob, os, pickle
 from   scipy.interpolate import interp1d
+
+import numpy as np
+np.seterr(divide='ignore', invalid='ignore')
 
 
 class PdfGenerator(object):
@@ -20,7 +22,7 @@ class PdfGenerator(object):
     which [if Y = (B,Z) dim = 2D] or [if Y=(W,B,Z) dim = 3D]
     """
 
-    def __init__(self, file_dir, N_pts=2**10, frames=10):
+    def __init__(self, file_dir, N_pts=2**8, frames=10):
         """Initialise the class to hold the grid, PDFs and Expectations."""
 
         self.file = file_dir + '/';
@@ -51,7 +53,7 @@ class PdfGenerator(object):
         # Expectations -----------------
         self.Plot_Titles = [r'$E\{∂z P |Y = y\}$',r'E\{ |∂xB|^2 + |∂zB|^2 |Y = y}',r'$E\{ (∂xB)(∂xW ) + (∂z B)(∂z W ) | Y = y \}$',r'$E\{ |∂xW|^2 + |∂zW|^2 |Y = y\}$']
         self.Save_Handles = ['dz Pressure','Grad buoyancy squared','Cross Grad Buoyancy Velocity','Grad velocity squared']
-        self.Expectations = {r'\partial_z P':{},r'\|dB\|^2':{},r' dW^T dB':{},r'\| dW \|^2':{}}
+        self.Expectations = {r'\partial_z P':{},r'\|\nabla B\|^2':{},r'\nabla W^T \nabla B':{},r'\|\nabla W \|^2':{}}
 
         for key,_ in self.Expectations.items():
     
@@ -285,7 +287,7 @@ class PdfGenerator(object):
 
         f  = h5py.File(self.file + 'scalar_data/scalar_data_s1.h5', mode='r')
         
-        fig, (ax1,ax2) = plt.subplots(ncols=2,figsize=(8,4))
+        fig, (ax1,ax2) = plt.subplots(ncols=2,figsize=(8,4),constrained_layout=True)
         ax1.semilogy(f['tasks/Eu(k)'][-1,:,0] ,'r.')
         ax1.set_ylabel(r'Kinetic Energy')
         ax1.set_xlabel(r'Fourier mode k')
@@ -303,7 +305,7 @@ class PdfGenerator(object):
         ax2.semilogy(f['tasks/Eb(Tz)'][-1,0,:],'b.')
         ax2.set_xlabel(r'Chebyshev polynomial Tz')
         fig.savefig('Buoyancy Energy Spectra', dpi=200)
-        plt.show()
+        # plt.show()
         plt.close(fig)
 
 
@@ -314,7 +316,7 @@ class PdfGenerator(object):
         B_avg  = f['tasks/<B>' ][:,0,0]
         t      = f['scales/sim_time'][()]
         
-        fig, axs = plt.subplots(2, 2)
+        fig, axs = plt.subplots(nrows=2,ncols=2,figsize=(8,4),constrained_layout=True)
         axs[0, 0].plot(t,Eu,'b-',label=r'$E_u$')
         axs[0, 0].set_title(r'$E_u$')
         axs[0, 1].plot(t,Eb,'r-',label=r'$E_b$')
@@ -323,9 +325,8 @@ class PdfGenerator(object):
         axs[1, 0].set_title(r'$\langle wB \rangle$')
         axs[1, 1].plot(t, B_avg,'r:',label=r'$\langle B  \rangle$')
         axs[1, 1].set_title(r'$\langle B  \rangle$')
-        plt.tight_layout()
         fig.savefig('EnergyTimeSeries.png',dpi=200)
-        plt.show()
+        # plt.show()
         plt.close(fig)
 
         return None;
@@ -343,16 +344,15 @@ class PdfGenerator(object):
         f     = h5py.File(self.file + 'scalar_data/scalar_data_s1.h5', mode='r')    
         file  = h5py.File(self.file + 'snapshots/snapshots_s1.h5'    , mode='r')
         times = file['tasks/buoyancy/'].dims[0]['sim_time'][:]
-        print('Total frames = ', len(times))
-        print('Averaging Window T = [%f,%f]'%( times[-self.frames], times[-1] ))
-        indx  = np.where(f['scales/sim_time'][()] > times[-self.frames])
-
         x = file['tasks/buoyancy'].dims[1][0][:]
         z = file['tasks/buoyancy'].dims[2][0][:]
         Lx = np.round(x[-1] - x[0])
         Lz = np.round(z[-1] - z[0])
         V = Lx*Lz  # Domain size
+        dt = f['scales/timestep'][0]
 
+
+        indx  = np.where(f['scales/sim_time'][()] > times[-self.frames])
         try:
             Disp_U = np.mean(f['tasks/dU^2(t)/Re'][:,0,0][indx])/V
         except:
@@ -387,18 +387,42 @@ class PdfGenerator(object):
                       '(1/2)<|B|^2>':.5*BE,'<|∇B|^2>':   Disp_B,
                       '<WB>':       wb_avg,'<B>':        B_avg }
 
-        print('  APE     &      RPE    &      E_k   &      <WB>   &       <e_U>/Re &   (1/2)<|B|^2> &      <e_B> &    <B> ')
-        print('%1.3e &  %1.3e &  %1.3e &   %1.3e &      %1.3e &      %1.3e &  %1.3e &  %1.3e '%(APE,RPE,.5*KE,wb_avg,Disp_U,.5*BE,Disp_B,B_avg) )
-        print('~~~~~~~~~~~~~~~~~~~~~ \n')
+
+        with open("Diagnostics.txt", "w") as text_file:
+            
+            indx  = np.where(times > times[-self.frames])
+            print('Nx,Nz,∆t = %d,%d,%e'%(len(x),len(z),dt),file=text_file); 
+            print('Available frames = ',len(times),'Used frames = ',len(times[indx]),'∆T frames = ',abs(times[1]-times[0]),'\n',file=text_file)
+            print('  APE     &      RPE    &      E_k   &      <WB>   &       <e_U>/Re &   (1/2)<|B|^2> &      <e_B> &    <B> ',file=text_file)
+            print('%1.3e &  %1.3e &  %1.3e &   %1.3e &      %1.3e &      %1.3e &  %1.3e &  %1.3e '%(APE,RPE,.5*KE,wb_avg,Disp_U,.5*BE,Disp_B,B_avg),file=text_file)
+            print('~~~~~~~~~~~~~~~~~~~~~ \n',file=text_file)
 
         return TPE,APE;    
 
 
 if __name__ == "__main__":
 
-    pdf = PdfGenerator(file_dir='test_data/rbc',N_pts=2**8,frames=5)
-    pdf.generate_pdf()       
-    pdf.generate_expectation()        
-    pdf.energetics()
-    pdf.spectra()
+    # Generate the pdf objects for all plots
+    
+    files = glob.glob('/data/pmannix/PDF_DNS_Data/' + '/Sim**')
+    
+    names_frames  = {'ICR':5000, 'IC':5000, 'RBC':1000, 'PLUME':1700, 'SINE':1200, 'STEP':2000}
+    
+    for file,(name,frames) in zip(files,names_frames.items()):
+        
+        # check names match
+        if name == file.split('/')[-1].split('_')[1]:
+
+            os.chdir(file)
+            print('## Simulation case: ',name,'## \n')
+
+            pdf = PdfGenerator(file_dir=file,N_pts=2**8,frames=frames)       
+
+            pdf.generate_pdf()
+            pdf.energetics()
+            pdf.spectra()
+            pdf.generate_expectation()
+
+            with open(name + '_pickled.pickle', 'wb') as f:
+                pickle.dump(pdf, f)
 
