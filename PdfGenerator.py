@@ -28,10 +28,7 @@ class PdfGenerator(object):
         self.file = file_dir + '/';
         self.frames = frames
         self.N = N_pts
-
-        # Data ----------------------
         self.data = self.load_data()
-        self.weights = None#self.chebyshev_weights()
 
         # Grid ----------------------
         self.b = np.zeros(self.N)
@@ -51,9 +48,9 @@ class PdfGenerator(object):
         self.fBZ = np.zeros((self.N,self.N))
 
         # Expectations -----------------
-        self.Plot_Titles = [r'$E\{∂z P |Y = y\}$',r'E\{ |∂xB|^2 + |∂zB|^2 |Y = y}',r'$E\{ (∂xB)(∂xW ) + (∂z B)(∂z W ) | Y = y \}$',r'$E\{ |∂xW|^2 + |∂zW|^2 |Y = y\}$']
-        self.Save_Handles = ['dz Pressure','Grad buoyancy squared','Cross Grad Buoyancy Velocity','Grad velocity squared']
-        self.Expectations = {r'\partial_z P':{},r'\|\nabla B\|^2':{},r'\nabla W^T \nabla B':{},r'\|\nabla W \|^2':{}}
+        self.Plot_Titles = [r'$E\{∂z P |Y = y\}$',r'E\{ |∂xB|^2 + |∂zB|^2 |Y = y}',r'$E\{ (∂xB)(∂xW ) + (∂z B)(∂z W ) | Y = y \}$',r'$E\{ |∂xW|^2 + |∂zW|^2 |Y = y\}$',r'$E\{B|Y=y\}']
+        self.Save_Handles = ['dz Pressure','Grad buoyancy squared','Cross Grad Buoyancy Velocity','Grad velocity squared', 'Buoyancy']
+        self.Expectations = {r'\partial_z P':{},r'\|\nabla B\|^2':{},r'\nabla W^T \nabla B':{},r'\|\nabla W \|^2':{}, r'B':{}}
 
         for key,_ in self.Expectations.items():
     
@@ -128,30 +125,6 @@ class PdfGenerator(object):
         y_new = interp1d(x, y, axis=1, fill_value="extrapolate")
 
         return y_new(x_new)
-    
-    def chebyshev_weights(self):
-        """Generate weights to account for non-uniform sampling on the Chebyshev grid."""
-
-        file = h5py.File(self.file + 'snapshots/snapshots_s1.h5', mode='r')
-        z_cheb = file['tasks/buoyancy'].dims[2][0][:]
-        x1D = file['tasks/buoyancy'].dims[1][0][:]
-
-        Nz = len(z_cheb)
-        x = [ 0.5*(1. -np.cos((np.pi/Nz)*(i + 0.5)) ) for i in range(Nz) ]
-        x_l = (3.*x[ 0] - x[ 1])/2.0
-        x_r = (3.*x[-1] - x[-2])/2.0
-        x_mod = np.concatenate( ([x_l],x,[x_r]))
-        x_bin = np.asarray([ 0.5*(x_mod[i]+x_mod[i+1]) for i in range(len(x_mod)-1) ])
-        we_i = abs(x_bin[0:-1]-x_bin[1:])/abs(x_bin[-1] - x_bin[0])
-
-        I = np.ones(len(x1D))
-        WE_i = np.outer(I,we_i).flatten() 
-
-        weights_split = [];
-        for i in range(1,self.frames+1,1):
-            weights_split.append(WE_i);
-
-        return np.concatenate(weights_split);
 
     def generate_pdf(self):
         """Generate all possible 1D and 2D PDFs."""
@@ -167,7 +140,7 @@ class PdfGenerator(object):
         data_1D = [W, B]
         for pdf_name,grid_name,X in zip(pdfs_1D,grid_1D,data_1D):
             
-            points, bin_edges = np.histogram(X.flatten(), bins=self.N, density=True, weights=self.weights)
+            points, bin_edges = np.histogram(X.flatten(), bins=self.N, density=True)
             grid = 0.5*(bin_edges[1:] + bin_edges[:-1])
             
             setattr(self,pdf_name,points)
@@ -177,7 +150,7 @@ class PdfGenerator(object):
         setattr(self,'z',Z)
 
         data_range = [[min(self.w), max(self.w)], [min(self.b), max(self.b)]]
-        fWB = np.histogram2d(x=W.flatten(), y=B.flatten(), bins=self.N, range=data_range, density=True, weights=self.weights)[0]
+        fWB = np.histogram2d(x=W.flatten(), y=B.flatten(), bins=self.N, range=data_range, density=True)[0]
         setattr(self,'fWB',fWB)
 
         fWZ = np.zeros((len(self.w),len(self.z)));
@@ -206,7 +179,7 @@ class PdfGenerator(object):
         print('------  Generating Conditional Expectations ------- \n ')
 
         W,B,Z,  dPGrad,B2Grad,WBGrad,W2Grad = self.data
-        Term_E = [dPGrad,B2Grad,WBGrad,W2Grad]
+        Term_E = [dPGrad,B2Grad,WBGrad,W2Grad,B]
         Nz = len(self.z)
 
         if not np.any(self.fB):
@@ -218,7 +191,7 @@ class PdfGenerator(object):
             
             for key_1D,X_i in zip(value['1D'].keys(),data_1D):
                 
-                f_XΦ,_,φ = np.histogram2d(X_i.flatten(),Φ.flatten(),bins=self.N,density=True, weights=self.weights)
+                f_XΦ,_,φ = np.histogram2d(X_i.flatten(),Φ.flatten(),bins=self.N,density=True)
                 φ = .5*(φ[1:]+φ[:-1]); dφ = φ[1] - φ[0];
 
                 # E{Φ|X} = int_φ f_Φ|X(φ|x)*φ dφ
@@ -331,7 +304,7 @@ class PdfGenerator(object):
 
         return None;
 
-    def energetics(self):
+    def energetics(self,name="0"):
         """Compute all time and space averaged diagnostic quantites including the available, total and 
         reference potential energies by using the reference height/CDF z*(b) = int_b fB(d) db = F_B(b)"""
        
@@ -388,7 +361,7 @@ class PdfGenerator(object):
                       '<WB>':       wb_avg,'<B>':        B_avg }
 
 
-        with open("Diagnostics.txt", "w") as text_file:
+        with open("Diagnostics_" + name + ".txt", "w") as text_file:
             
             indx  = np.where(times > times[-self.frames])
             print('Nx,Nz,∆t = %d,%d,%e'%(len(x),len(z),dt),file=text_file); 
@@ -397,7 +370,7 @@ class PdfGenerator(object):
             print('%1.3e &  %1.3e &  %1.3e &   %1.3e &      %1.3e &      %1.3e &  %1.3e &  %1.3e '%(APE,RPE,.5*KE,wb_avg,Disp_U,.5*BE,Disp_B,B_avg),file=text_file)
             print('~~~~~~~~~~~~~~~~~~~~~ \n',file=text_file)
 
-        return TPE,APE;    
+        return TPE, APE    
 
 
 if __name__ == "__main__":
@@ -416,13 +389,20 @@ if __name__ == "__main__":
             os.chdir(file)
             print('## Simulation case: ',name,'## \n')
 
-            pdf = PdfGenerator(file_dir=file,N_pts=2**8,frames=frames)       
+            pdf = PdfGenerator(file_dir=file,N_pts=2**8,frames=10)       
 
             pdf.generate_pdf()
-            pdf.energetics()
+            pdf.energetics(name)
             pdf.spectra()
             pdf.generate_expectation()
+
+            # Remove loaded data snapshots before saving
+            delattr(pdf, "data")
 
             with open(name + '_pickled.pickle', 'wb') as f:
                 pickle.dump(pdf, f)
 
+
+    # To copy all the files generated to your data folder use
+    # $ cp -vr **/*.pickle /home/pmannix/Stratification-DNS/data/
+    # $ cp -vr **/*.txt /home/pmannix/Stratification-DNS/data/

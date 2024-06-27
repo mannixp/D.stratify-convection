@@ -56,7 +56,7 @@ def test_expectation_1d_rbc():
     pdf.generate_expectation(testing=True)
 
     db = pdf.b[1] - pdf.b[0]
-    e_B = np.nansum( pdf.Expectations[r'\|dB\|^2']['1D']['b'] * db )
+    e_B = np.nansum( pdf.Expectations[r'\|\nabla B\|^2']['1D']['b'] * db )
 
     assert abs(e_B - 1) < 5e-03
 
@@ -68,7 +68,7 @@ def test_expectation_1d_ihc():
     pdf.generate_expectation(testing=True)
 
     db = pdf.b[1] - pdf.b[0]
-    e_B = np.nansum( pdf.Expectations[r'\|dB\|^2']['1D']['b'] * db )
+    e_B = np.nansum( pdf.Expectations[r'\|\nabla B\|^2']['1D']['b'] * db )
     
     assert abs(e_B - 1/12)/abs(e_B) < 1e-02
 
@@ -81,13 +81,13 @@ def test_expectation_2d_rbc():
 
     dw = pdf.w[1] - pdf.w[0]
     db = pdf.b[1] - pdf.b[0]
-    e_B = np.nansum( pdf.Expectations[r'\|dB\|^2']['2D']['wb'] * db * dw ) 
+    e_B = np.nansum( pdf.Expectations[r'\|\nabla B\|^2']['2D']['wb'] * db * dw ) 
 
     assert abs(e_B - 1) < 5e-03
 
     dz = pdf.z[1] - pdf.z[0]
     db = pdf.b[1] - pdf.b[0]
-    e_B = np.nansum( pdf.Expectations[r'\|dB\|^2']['2D']['bz'] * db * dz ) 
+    e_B = np.nansum( pdf.Expectations[r'\|\nabla B\|^2']['2D']['bz'] * db * dz ) 
 
     assert abs(e_B - 1) < 5e-03
 
@@ -100,12 +100,12 @@ def test_expectation_2d_ihc():
 
     dw = pdf.w[1] - pdf.w[0]
     db = pdf.b[1] - pdf.b[0]
-    e_B = np.nansum( pdf.Expectations[r'\|dB\|^2']['2D']['wb'] * db * dw) 
+    e_B = np.nansum( pdf.Expectations[r'\|\nabla B\|^2']['2D']['wb'] * db * dw) 
     
     assert abs(e_B - 1/12)/abs(e_B) < 1e-02
 
     dz = pdf.z[1] - pdf.z[0]
     db = pdf.b[1] - pdf.b[0]
-    e_B = np.nansum( pdf.Expectations[r'\|dB\|^2']['2D']['bz'] * db * dz) 
+    e_B = np.nansum( pdf.Expectations[r'\|\nabla B\|^2']['2D']['bz'] * db * dz) 
 
     assert abs(e_B - 1/12)/abs(e_B) < 1e-02

@@ -1,45 +1,36 @@
-"""
-
-Generate the figures for the paper
-
-"""
-
-
-# %%
-#%matplotlib inline
-
-from PdfGenerator import PDF_Master
-import pickle
-
 from matplotlib import rc
-
-#rc('text', usetex=True)
+rc('text', usetex=True)
 rc('font', family='serif')
-rc('font', size=25.0)
+rc('font', size=20.0)
+import matplotlib.pyplot as plt
 
-import os
-Dir = '/home/pmannix/Dstratify/DNS_RBC/'
+import os, pickle
+import numpy as np
+from scipy.ndimage import gaussian_filter1d
 
-# %%
+from PdfGenerator import PdfGenerator
+from PdfPlotter import PdfPlotter
+
+Dir = '/home/pmannix/Stratification-DNS/'
 
 # Paper figures section f_BZ
 # ~~~~~~~~~~~~~~ # ~~~~~~~~~~~~~~
-# name = 'figures_fBZ'
-# print(name)
-# os.mkdir(Dir+name) 
-# os.chdir(Dir+name)
+name = 'figures_fBZ'
+print(name)
+os.mkdir(Dir+name) 
+os.chdir(Dir+name)
 
-# with open(Dir +'mypickleIC_Noise.pickle','rb') as f:
-#     pdf = pickle.load(f)
-# pdf.Decomposition(interval=pdf.domain,figname='Compare_Terms_fB_IC.png',)
-# pdf.Plot_EBZ(interval = pdf.domain, term='\|dB\|^2', figname='IC_E_BZ_and_f_BZ.png',dpi=200,Nlevels=15,sigma_smooth=2)
+with open(Dir+'data/IC_pickled.pickle', 'rb') as f:
+    plotter = PdfPlotter(pdf=pickle.load(f), interval=None)
+    plotter.Decomposition(figname='Compare_Terms_fB_IC.png')
+    plotter.plot_EBZ(term=r'\|\nabla B\|^2', figname='IC_E_BZ_and_f_BZ.png', Nlevels=15, sigma_smooth=2)
 
-# with open(Dir + 'mypickleRBC.pickle','rb') as f:
-#     pdf = pickle.load(f)
-# pdf.Decomposition(interval=pdf.domain,figname='Compare_Terms_fB_RBC.png',)
-# pdf.Plot_EBZ(interval = pdf.domain, term='\|dB\|^2', figname='RBC_E_BZ_and_f_BZ.png',dpi=200,Nlevels=15,sigma_smooth=2)
+with open(Dir+'data/RBC_pickled.pickle', 'rb') as f:
+    plotter = PdfPlotter(pdf=pickle.load(f), interval=None)
+    plotter.Decomposition(figname='Compare_Terms_fB_RBC.png')
+    plotter.plot_EBZ(term=r'\|\nabla B\|^2', figname='RBC_E_BZ_and_f_BZ.png', Nlevels=15, sigma_smooth=2)
 
-# os.chdir(Dir)
+os.chdir(Dir)
 
 # Paper figures section f_WZ
 # ~~~~~~~~~~~~~~ # ~~~~~~~~~~~~~~
@@ -48,35 +39,44 @@ print(name)
 os.mkdir(Dir+name) 
 os.chdir(Dir+name)
 
-with open(Dir +'mypickleRBC_Sine.pickle','rb') as f:
-    pdf = pickle.load(f)
-pdf.Plot_EWZ(interval = pdf.domain, term='B'           , figname='HC_E_B___WZ_and_f_WZ.png',dpi=200,Nlevels=30,sigma_smooth=2)
-pdf.Plot_EWZ(interval = pdf.domain, term='\partial_z P', figname='HC_E_dPZ_WZ_and_f_WZ.png',dpi=200,Nlevels=30,sigma_smooth=2)
-pdf.Plot_EWZ(interval = pdf.domain, term='\| dW \|^2'  , figname='HC_E_dB2_WZ_and_f_WZ.png',dpi=200,Nlevels=30,sigma_smooth=2)
+with open(Dir+'data/SINE_pickled.pickle', 'rb') as f:
+    plotter = PdfPlotter(pdf=pickle.load(f), interval=None)
+    plotter.plot_EWZ(term=r'B', figname='HC_E_B___WZ_and_f_WZ.png', Nlevels=30, sigma_smooth=2)
+    plotter.plot_EWZ(term=r'\partial_z P', figname='HC_E_dPZ_WZ_and_f_WZ.png', Nlevels=30, sigma_smooth=2)
+    plotter.plot_EWZ(term=r'\|\nabla W \|^2', figname='HC_E_dB2_WZ_and_f_WZ.png', Nlevels=30, sigma_smooth=2)
+    plotter.plot_EWZ(term='both', figname='HC_E_BPZ_WZ_and_f_WZ.png', Nlevels=30, sigma_smooth=2)
 
-with open(Dir +'mypickleIC.pickle','rb') as f:
-    pdf = pickle.load(f)
-pdf.Plot_EWZ(interval = pdf.domain, term='B'           , figname='IC_E_B___WZ_and_f_WZ.png')
-pdf.Plot_EWZ(interval = pdf.domain, term='\partial_z P', figname='IC_E_dPZ_WZ_and_f_WZ.png')
-pdf.Plot_EWZ(interval = pdf.domain, term='\| dW \|^2'  , figname='IC_E_dB2_WZ_and_f_WZ.png')
+with open(Dir+'data/IC_pickled.pickle', 'rb') as f:
+    plotter = PdfPlotter(pdf=pickle.load(f), interval=None)
+    plotter.plot_EWZ(term=r'B', figname='IC_E_B___WZ_and_f_WZ.png')
+    plotter.plot_EWZ(term=r'\partial_z P', figname='IC_E_dPZ_WZ_and_f_WZ.png')
+    plotter.plot_EWZ(term=r'\|\nabla W \|^2', figname='IC_E_dB2_WZ_and_f_WZ.png')
+    plotter.plot_EWZ(term='both', figname='IC_E_BPZ_WZ_and_f_WZ.png',)
 
 os.chdir(Dir)
 
 # Paper figures section f_WB
 # ~~~~~~~~~~~~~~ # ~~~~~~~~~~~~~~
+name = 'figures_fWB'
+print(name)
+os.mkdir(Dir+name) 
+os.chdir(Dir+name)
 
-# with open('mypickleIC.pickle','rb') as f:
-#     pdf_A = pickle.load(f)
-# pdf_A.Plot_EWB(interval = pdf_A.domain, term='\partial_z P', figname='IC_E_dPz_WB_and_f_WB.png')
-# pdf_A.Plot_EWB(interval = pdf_A.domain, term='\|dB\|^2', figname='IC_E_dB2_WB_and_f_WB.png')
-# pdf_A.Plot_EWB(interval = pdf_A.domain, term=' dW^T dB', figname='IC_E_dWdB_WB_and_f_WB.png')
-# pdf_A.Plot_EWB(interval = pdf_A.domain, term='\| dW \|^2', figname='IC_E_dW2_WB_and_f_WB.png')
+with open(Dir+'data/IC_pickled.pickle', 'rb') as f:
+    plotter = PdfPlotter(pdf=pickle.load(f), interval=None)
+    plotter.plot_EWB(term=r'\partial_z P', figname='IC_E_dPz_WB_and_f_WB.png')
+    plotter.plot_EWB(term=r'\|\nabla B\|^2', figname='IC_E_dB2_WB_and_f_WB.png')
+    plotter.plot_EWB(term=r'\nabla W^T \nabla B', figname='IC_E_dWdB_WB_and_f_WB.png')
+    plotter.plot_EWB(term=r'\|\nabla W \|^2', figname='IC_E_dW2_WB_and_f_WB.png')
+    plotter.plot_EWB(term='both', figname='IC_E_BdPz_WB_and_f_WB.png')
 
-# with open('mypickleRBC.pickle','rb') as f:
-#     pdf_A = pickle.load(f)
-# pdf_A.Plot_EWB(interval = pdf_A.domain, term='\partial_z P', figname='RBC_E_dPz_WB_and_f_WB.png')
-# pdf_A.Plot_EWB(interval = pdf_A.domain, term='\|dB\|^2', figname='RBC_E_dB2_WB_and_f_WB.png')
-# pdf_A.Plot_EWB(interval = pdf_A.domain, term=' dW^T dB', figname='RBC_E_dWdB_WB_and_f_WB.png')
-# pdf_A.Plot_EWB(interval = pdf_A.domain, term='\| dW \|^2', figname='RBC_E_dW2_WB_and_f_WB.png')
+with open(Dir+'data/RBC_pickled.pickle', 'rb') as f:
+    plotter = PdfPlotter(pdf=pickle.load(f), interval=None)
+    plotter.plot_EWB(term=r'\partial_z P', figname='RBC_E_dPz_WB_and_f_WB.png')
+    plotter.plot_EWB(term=r'\|\nabla B\|^2', figname='RBC_E_dB2_WB_and_f_WB.png')
+    plotter.plot_EWB(term=r'\nabla W^T \nabla B', figname='RBC_E_dWdB_WB_and_f_WB.png')
+    plotter.plot_EWB(term=r'\|\nabla W \|^2', figname='RBC_E_dW2_WB_and_f_WB.png')
+    plotter.plot_EWB(term='both', figname='RBC_E_BdPz_WB_and_f_WB.png')
 
-# %%
+os.chdir(Dir)
+
