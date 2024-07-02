@@ -1,6 +1,6 @@
 import numpy as np
-import os,h5py,glob
-from pyevtk.hl import gridToVTK # 
+import os, h5py, glob
+from pyevtk.hl import gridToVTK
 
 def Make_VTK(DIR_ABS_PATH,OUT_FILE,time_index=-1):
 
@@ -22,9 +22,9 @@ def Make_VTK(DIR_ABS_PATH,OUT_FILE,time_index=-1):
     """
 
     try:
-        F1   = glob.glob(DIR_ABS_PATH + '/snapshots/*');
+        F1 = glob.glob(DIR_ABS_PATH + '/snapshots/*');
         print(F1)
-        file = h5py.File(F1[0], 'r'); 
+        file = h5py.File(F1[-1], 'r'); 
     except:
         pass;
     
@@ -56,27 +56,22 @@ def Make_VTK(DIR_ABS_PATH,OUT_FILE,time_index=-1):
 
 
     os.chdir(DIR_ABS_PATH)
-    gridToVTK(OUT_FILE, x,y,z, pointData = {"U":U,"W":W,  "B":B})
+    gridToVTK(OUT_FILE, x,y,z, pointData = {"U":U, "W":W, "B":B})
 
     return None;
 
-# Execute as main
 if __name__ == "__main__":
 
-    PATH         = "/data/pmannix/PDF_DNS_Data/";
+    PATH = "/data/pmannix/PDF_DNS_Data/"
     
-    #IN_FILE      = "RBC9_1e10";
-    #IN_FILE      = "HC_Ra1e10_T2e04";
-    #IN_FILE      = "STEP_Ra1e9_T3e03";
-    #IN_FILE      = "IC_Ra1e11_T3e04";
-    IN_FILE      = "ICR_Ra1e11_T8e04";
-    #IN_FILE      = "PLUME_Ra1e9_T2e03";
+    #IN_FILE = "Sim_ICR_Ra1e11_T8e04"
+    #IN_FILE = "Sim_RBC_Ra1e09"
+    #IN_FILE = "Sim_STEP_Ra1e9"
+    #IN_FILE = "Sim_IC_Ra1e11_T3e04"
+    IN_FILE = "Sim_PLUME_Ra1e09"
+    #IN_FILE = "Sim_SINE_Ra1e10"
 
-    PATH = "/home/pmannix/Stratification-DNS/"
-    IN_FILE      = "Plumes1e08";
-
-    DIR_ABS_PATH = PATH + IN_FILE; 
+    DIR_ABS_PATH = PATH + IN_FILE
     OUT_FILE     = PATH + "para_visualisation"
 
-    
-    Make_VTK(DIR_ABS_PATH, OUT_FILE);
+    Make_VTK(DIR_ABS_PATH, OUT_FILE)

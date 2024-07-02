@@ -1,5 +1,5 @@
 from matplotlib import rc
-rc('text', usetex=True)
+#rc('text', usetex=True)
 rc('font', family='serif')
 rc('font', size=16.0)
 
@@ -389,7 +389,7 @@ if __name__ == "__main__":
             os.chdir(file)
             print('## Simulation case: ',name,'## \n')
 
-            pdf = PdfGenerator(file_dir=file,N_pts=2**8,frames=10)       
+            pdf = PdfGenerator(file_dir=file,N_pts=2**8,frames=frames)       
 
             pdf.generate_pdf()
             pdf.energetics(name)
@@ -404,5 +404,6 @@ if __name__ == "__main__":
 
 
     # To copy all the files generated to your data folder use
+    # $ cd /data/pmannix/PDF_DNS_Data
     # $ cp -vr **/*.pickle /home/pmannix/Stratification-DNS/data/
     # $ cp -vr **/*.txt /home/pmannix/Stratification-DNS/data/
