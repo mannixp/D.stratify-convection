@@ -154,7 +154,7 @@ class PdfPlotter(object):
         """Return a plot of f_B,f_BZ on which we can overlay the expectations."""
 
         b_idx, w_idx, z_idx = self.calculate_interval()
-        fig, axs = plt.subplots(2,1,figsize=(12,8),height_ratios=[2,3],sharex=True,constrained_layout=True)
+        fig, axs = plt.subplots(4,1,figsize=(12,8),height_ratios=[1.5,.5,1.5,.5],sharex=True,constrained_layout=True)
         
         # 1D PDFs ---------------
         axs[0].plot(self.pdf.b[b_idx],self.pdf.fB[b_idx],'r')
@@ -162,14 +162,26 @@ class PdfPlotter(object):
         axs[0].fill_between(x=self.pdf.b[b_idx],y1=self.pdf.fB[b_idx],color= "r",alpha= 0.2)
         axs[0].set_ylabel(r'$f_B(b)$',color='r', fontsize=30)
         axs[0].tick_params(axis="y",labelcolor="r")
-        axs[0].tick_params(axis='both', labelsize=30)
-        #axs[0].set_yticks(fontsize=30)
 
         # 2D PDFs ---------------
+        axs[2].contourf(self.pdf.b[b_idx], self.pdf.z[z_idx], self.pdf.fBZ[b_idx,:][:,z_idx].T,cmap='Reds', levels=Nlevels, norm=norm)
+        axs[2].set_ylabel(r"$z$", fontsize=30)
+
+        # top inset
+        idx1 = np.where(self.pdf.z < 1)
+        idx2 = np.where(self.pdf.z > 0.95)
+        z_idx = np.intersect1d(idx1,idx2)
         axs[1].contourf(self.pdf.b[b_idx], self.pdf.z[z_idx], self.pdf.fBZ[b_idx,:][:,z_idx].T,cmap='Reds', levels=Nlevels, norm=norm)
-        axs[1].set_xlabel(r"$b$", fontsize=30)
-        axs[1].set_ylabel(r"$z$", fontsize=30)
-        axs[1].tick_params(axis='both', labelsize=30)
+
+        # bottom inset
+        idx1 = np.where(self.pdf.z < 0.05)
+        idx2 = np.where(self.pdf.z > 0)
+        z_idx = np.intersect1d(idx1,idx2)
+        axs[3].contourf(self.pdf.b[b_idx], self.pdf.z[z_idx], self.pdf.fBZ[b_idx,:][:,z_idx].T,cmap='Reds', levels=Nlevels, norm=norm)
+        axs[3].set_xlabel(r"$b$", fontsize=30)
+        
+        for ax in axs:
+            ax.tick_params(axis='both', labelsize=30)
 
         if figname != None:
             fig.savefig(figname, dpi=200)
@@ -192,16 +204,31 @@ class PdfPlotter(object):
 
         twin_00 = axs[0].twinx()
         twin_00.plot(self.pdf.b[b_idx], E_1D['b'][b_idx], 'b')
-        twin_00.set_ylabel(r'$E\{ |\nabla B|^2 | b \}$', color="b", fontsize=30)
-        twin_00.tick_params(axis="y", labelcolor="b")
+        twin_00.set_ylabel(r'$E_B[|\nabla B|^2 ]$', color="b", fontsize=30)
+        twin_00.tick_params(axis="y", labelcolor="b", labelsize=30)
 
         Z = gaussian_filter1d(E_2D['bz'][b_idx,:][:,z_idx], sigma=sigma_smooth, truncate=3.0)
+        CS_10  = axs[2].contour(self.pdf.b[b_idx], self.pdf.z[z_idx], Z.T, levels=Nlevels, norm=norm, cmap='Blues')
+        axs[2].clabel(CS_10, inline=False, fontsize=1)
+
+        # top inset
+        idx1 = np.where(self.pdf.z < 1)
+        idx2 = np.where(self.pdf.z > 0.95)
+        z_idx = np.intersect1d(idx1,idx2)
+        Z = gaussian_filter1d(E_2D['bz'][b_idx,:][:,z_idx], sigma=sigma_smooth, truncate=3.0)
         CS_10  = axs[1].contour(self.pdf.b[b_idx], self.pdf.z[z_idx], Z.T, levels=Nlevels, norm=norm, cmap='Blues')
-        axs[1].clabel(CS_10, inline=False, fontsize=1)
+
+        # bottom inset
+        idx1 = np.where(self.pdf.z < 0.05)
+        idx2 = np.where(self.pdf.z > 0)
+        z_idx = np.intersect1d(idx1,idx2)
+        Z = gaussian_filter1d(E_2D['bz'][b_idx,:][:,z_idx], sigma=sigma_smooth, truncate=3.0)
+        CS_10  = axs[3].contour(self.pdf.b[b_idx], self.pdf.z[z_idx], Z.T, levels=Nlevels, norm=norm, cmap='Blues')
 
         if figname != None:
             fig.savefig(figname, dpi=200)
         plt.close(fig)
+        #plt.show()
 
         return None
 
@@ -250,17 +277,17 @@ class PdfPlotter(object):
        
         # Plot E[Φ|B=b]
         twin2 = ax[2].twinx()
-        twin2.plot(self.pdf.b[b_idx][1:-1],-1.*(Φ[b_idx][1:-1]*ddf)/Φ_norm,'b-',label=r"$-E\{|\nabla B|^2|b\} \frac{\partial^2 f_B}{\partial b^2}$")
+        twin2.plot(self.pdf.b[b_idx][1:-1],1.*(Φ[b_idx][1:-1]*ddf)/Φ_norm,'b-',label=r"$E_B[|\nabla B|^2] \frac{\partial^2 f_B}{\partial b^2}$")
         twin2.legend(loc=1,fontsize=14)
         #twin2.set_yticks([])
         
         twin1 = ax[1].twinx()
-        twin1.plot(self.pdf.b[b_idx][1:-1],-1.*(dΦ*df)/dΦ_norm,'b-',label=r"$-E\{|\nabla B|^2|b\}' \frac{\partial f_B}{\partial b}$")
+        twin1.plot(self.pdf.b[b_idx][1:-1],1.*(dΦ*df)/dΦ_norm,'b-',label=r"$E_B[|\nabla B|^2]' \frac{\partial f_B}{\partial b}$")
         twin1.legend(loc=3,fontsize=14)
         #twin1.set_yticks([])
 
         twin0 = ax[0].twinx()
-        twin0.plot(self.pdf.b[b_idx][1:-1],-1.*(ddΦ*fB[b_idx][1:-1])/ddΦ_norm, 'b-',label=r"$-E\{|\nabla B|^2|b\}'' f_B$")
+        twin0.plot(self.pdf.b[b_idx][1:-1],1.*(ddΦ*fB[b_idx][1:-1])/ddΦ_norm, 'b-',label=r"$E_B[|\nabla B|^2]'' f_B$")
         twin0.legend(loc=3,fontsize=14)
         #twin0.set_yticks([])
 
@@ -308,7 +335,7 @@ class PdfPlotter(object):
 
         return fig, axs
 
-    def plot_EWZ(self, term, Ra=1, figname=None, Nlevels=15, norm='log', sigma_smooth=2):
+    def plot_EWZ(self, term, Ra=1, figname=None, Nlevels=15, norm='linear', sigma_smooth=2):
         """
         Using the plots of the pdfs overlay the expectations in terms:
         - contours for surface plots
@@ -322,26 +349,26 @@ class PdfPlotter(object):
         if term == r'\|\nabla W \|^2': 
             E_1D = self.pdf.Expectations[term]['1D']['w']/np.sqrt(Ra)
             E_2D = self.pdf.Expectations[term]['2D']['wz']/np.sqrt(Ra)
-            twin_00.set_ylabel(r'$E\{ |\nabla W|^2 | w \}/Re$', color="b", fontsize=30)
+            twin_00.set_ylabel(r'$E_W[ |\nabla W|^2 ]/Re$', color="b", fontsize=30)
 
         elif term == r'\partial_z P': 
             E_1D = -1.*self.pdf.Expectations[term]['1D']['w']
             E_2D = -1.*self.pdf.Expectations[term]['2D']['wz']
-            twin_00.set_ylabel(r'$-E\{ \partial_z P | w \}$', color="b", fontsize=30)
+            twin_00.set_ylabel(r'$E_W[-\partial_z P ]$', color="b", fontsize=30)
 
         elif term == r'B':   
             E_1D = self.pdf.Expectations[term]['1D']['w']
             E_2D = self.pdf.Expectations[term]['2D']['wz']
-            twin_00.set_ylabel(r'$E\{ B | w \}$', color="b", fontsize=30)
+            twin_00.set_ylabel(r'$E_W[B]$', color="b", fontsize=30)
 
         elif term == 'both':
             E_1D = self.pdf.Expectations[r'B']['1D']['w'] - self.pdf.Expectations['\partial_z P']['1D']['w']
             E_2D = self.pdf.Expectations[r'B']['2D']['wz'] - self.pdf.Expectations['\partial_z P']['2D']['wz']
-            twin_00.set_ylabel(r'$E\{ B - \partial_z P | w \}$', color="b", fontsize=30)
+            twin_00.set_ylabel(r'$E_W[B - \partial_z P]$', color="b", fontsize=30)
 
         # plot 1D Expectation 
         twin_00.plot(self.pdf.w[w_idx], E_1D[w_idx], 'b-')
-        twin_00.tick_params(axis="y",labelcolor="b")
+        twin_00.tick_params(axis="y",labelcolor="b", labelsize=30)
 
         # plot 2D Expectations
         Z = gaussian_filter1d(E_2D[w_idx,:][:,z_idx], sigma=sigma_smooth, truncate=3.0)
@@ -422,12 +449,12 @@ class PdfPlotter(object):
         #Make the tickmarks pretty
         ticklabels = axTemperature.get_xticklabels()
         for label in ticklabels:
-            label.set_fontsize(20)
+            label.set_fontsize(24)
             label.set_family('serif')
         
         ticklabels = axTemperature.get_yticklabels()
         for label in ticklabels:
-            label.set_fontsize(20)
+            label.set_fontsize(24)
             label.set_family('serif')
         
         #Set up the plot limits
@@ -528,28 +555,17 @@ class PdfPlotter(object):
         axTemperature.clabel(CS_10, inline=False, fontsize=1)
 
         # 1D Expectationss ---------------
-        if term == 'both':
-            
             twin_x = axHistx.twinx()
             twin_x.plot(x,f_x, 'b-.')
-            twin_x.set_ylabel(r'$E\{-|w\}$',color="b",fontsize=30);
+            twin_x.set_ylabel(r'$E_W[-]$',color="b",fontsize=30);
             twin_x.tick_params(axis="y",labelcolor="b")
+            twin_x.ticklabel_format(axis='y',style='sci',scilimits=(0,0))
 
             twin_y = axHisty.twiny()
             twin_y.plot(f_y, y, 'b-.')
-            twin_y.set_xlabel(r'$E\{-|b\}$',color="b",fontsize=30);
+            twin_y.set_xlabel(r'$E_B[-]$',color="b",fontsize=30);
             twin_y.tick_params(axis="x",labelcolor="b")
-
-        else:
-            twin_x = axHistx.twinx()
-            twin_x.plot(x,f_x, 'b-.')
-            twin_x.set_ylabel(r'$E\{-|w\}$',color="b",fontsize=30);
-            twin_x.tick_params(axis="y",labelcolor="b")
-
-            twin_y = axHisty.twiny()
-            twin_y.plot(f_y, y, 'b-.')
-            twin_y.set_xlabel(r'$E\{-|b\}$',color="b",fontsize=30);
-            twin_y.tick_params(axis="x",labelcolor="b")
+            twin_y.ticklabel_format(axis='x',style='sci',scilimits=(0,0))
 
         #Make the tickmarks pretty
         ticklabels = twin_x.get_yticklabels()
@@ -566,6 +582,7 @@ class PdfPlotter(object):
         #Cool trick that changes the number of tickmarks for the histogram axes
         twin_y.xaxis.set_major_locator(MaxNLocator(3))
         twin_x.yaxis.set_major_locator(MaxNLocator(3))
+
 
         if figname != None:
             fig.savefig(figname, dpi=200)
