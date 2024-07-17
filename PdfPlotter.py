@@ -1,7 +1,7 @@
 from matplotlib import rc
 rc('text', usetex=True)
 rc('font', family='serif')
-rc('font', size=16.0)
+rc('font', size=20.0)
 
 import matplotlib.pyplot as plt
 import glob, os, pickle
@@ -39,14 +39,14 @@ class PdfPlotter(object):
             idx2 = np.where(self.pdf.w > self.interval['w'][0])
             w_idx = np.intersect1d(idx1,idx2)
 
-            idx1 = np.where(self.pdf.z < self.interval['z'][1])
-            idx2 = np.where(self.pdf.z > self.interval['z'][0])
-            z_idx = np.intersect1d(idx1,idx2)
+            # idx1 = np.where(self.pdf.z < self.interval['z'][1])
+            # idx2 = np.where(self.pdf.z > self.interval['z'][0])
+            # z_idx = np.intersect1d(idx1,idx2)
 
         else:
             b_idx = np.arange(0,len(self.pdf.b),1)
             w_idx = np.arange(0,len(self.pdf.w),1)
-            z_idx = np.arange(0,len(self.pdf.z),1)
+        z_idx = np.arange(0,len(self.pdf.z),1)
 
         return b_idx, w_idx, z_idx
     
@@ -160,14 +160,16 @@ class PdfPlotter(object):
         axs[0].plot(self.pdf.b[b_idx],self.pdf.fB[b_idx],'r')
         axs[0].set_ylim([0.,1.01*max(self.pdf.fB[b_idx])])
         axs[0].fill_between(x=self.pdf.b[b_idx],y1=self.pdf.fB[b_idx],color= "r",alpha= 0.2)
-        axs[0].set_ylabel(r'$f_B(b)$',color='r')
+        axs[0].set_ylabel(r'$f_B(b)$',color='r', fontsize=30)
         axs[0].tick_params(axis="y",labelcolor="r")
+        axs[0].tick_params(axis='both', labelsize=30)
+        #axs[0].set_yticks(fontsize=30)
 
         # 2D PDFs ---------------
-        #axs[1].pcolormesh(self.b[b_idx], self.z[z_idx], self.fBZ[b_idx,:][:,z_idx].T,cmap='Reds' ,norm='linear')
         axs[1].contourf(self.pdf.b[b_idx], self.pdf.z[z_idx], self.pdf.fBZ[b_idx,:][:,z_idx].T,cmap='Reds', levels=Nlevels, norm=norm)
-        axs[1].set_xlabel(r"$b$")
-        axs[1].set_ylabel(r"$z$")
+        axs[1].set_xlabel(r"$b$", fontsize=30)
+        axs[1].set_ylabel(r"$z$", fontsize=30)
+        axs[1].tick_params(axis='both', labelsize=30)
 
         if figname != None:
             fig.savefig(figname, dpi=200)
@@ -190,7 +192,7 @@ class PdfPlotter(object):
 
         twin_00 = axs[0].twinx()
         twin_00.plot(self.pdf.b[b_idx], E_1D['b'][b_idx], 'b')
-        twin_00.set_ylabel(r'$E\{ |\nabla B|^2 | b \}$', color="b")
+        twin_00.set_ylabel(r'$E\{ |\nabla B|^2 | b \}$', color="b", fontsize=30)
         twin_00.tick_params(axis="y", labelcolor="b")
 
         Z = gaussian_filter1d(E_2D['bz'][b_idx,:][:,z_idx], sigma=sigma_smooth, truncate=3.0)
@@ -241,26 +243,26 @@ class PdfPlotter(object):
         ax[1].set_ylabel(r'$f_B(b)$',fontsize=20)
         ax[0].set_ylabel(r'$f_B(b)$',fontsize=20)
 
-        # ax[2].set_xlim(interval['b'])
-        # ax[1].set_xlim(interval['b'])
-        # ax[0].set_xlim(interval['b'])
+        ax[2].set_xlim(self.interval['b'])
+        ax[1].set_xlim(self.interval['b'])
+        ax[0].set_xlim(self.interval['b'])
 
        
         # Plot E[Φ|B=b]
         twin2 = ax[2].twinx()
         twin2.plot(self.pdf.b[b_idx][1:-1],-1.*(Φ[b_idx][1:-1]*ddf)/Φ_norm,'b-',label=r"$-E\{|\nabla B|^2|b\} \frac{\partial^2 f_B}{\partial b^2}$")
         twin2.legend(loc=1,fontsize=14)
-        twin2.set_yticks([])
+        #twin2.set_yticks([])
         
         twin1 = ax[1].twinx()
         twin1.plot(self.pdf.b[b_idx][1:-1],-1.*(dΦ*df)/dΦ_norm,'b-',label=r"$-E\{|\nabla B|^2|b\}' \frac{\partial f_B}{\partial b}$")
         twin1.legend(loc=3,fontsize=14)
-        twin1.set_yticks([])
+        #twin1.set_yticks([])
 
         twin0 = ax[0].twinx()
         twin0.plot(self.pdf.b[b_idx][1:-1],-1.*(ddΦ*fB[b_idx][1:-1])/ddΦ_norm, 'b-',label=r"$-E\{|\nabla B|^2|b\}'' f_B$")
         twin0.legend(loc=3,fontsize=14)
-        twin0.set_yticks([])
+        #twin0.set_yticks([])
 
         print('|Φ| =',Φ_norm)
         print('|dΦ/db| =',dΦ_norm)
@@ -288,15 +290,17 @@ class PdfPlotter(object):
         axs[0].plot(self.pdf.w[w_idx],self.pdf.fW[w_idx],'r')
         axs[0].set_ylim([0.,1.01*max(self.pdf.fW[w_idx])])
         axs[0].fill_between(x=self.pdf.w[w_idx],y1=self.pdf.fW[w_idx],color= "r",alpha= 0.2)
-        axs[0].set_ylabel(r'$f_W(w)$',color='r')
+        axs[0].set_ylabel(r'$f_W(w)$',color='r', fontsize=30)
         axs[0].tick_params(axis="y",labelcolor="r")
-        #axs[0].set_xticks([])
+        axs[0].tick_params(axis='both', labelsize=30)
+
 
         # 2D PDFs ---------------
         #axs[1].pcolormesh(self.w[w_idx], self.z[z_idx], self.fWZ[w_idx,:][:,z_idx].T,cmap='Reds' ,norm='linear')
         axs[1].contourf(self.pdf.w[w_idx], self.pdf.z[z_idx], self.pdf.fWZ[w_idx,:][:,z_idx].T, cmap='Reds', levels=10*Nlevels, norm=norm)
-        axs[1].set_xlabel(r"$w$")
-        axs[1].set_ylabel(r"$z$")
+        axs[1].set_xlabel(r"$w$", fontsize=30)
+        axs[1].set_ylabel(r"$z$", fontsize=30)
+        axs[1].tick_params(axis='both', labelsize=30)
 
         if figname != None:
             fig.savefig(figname, dpi=200)
@@ -318,22 +322,22 @@ class PdfPlotter(object):
         if term == r'\|\nabla W \|^2': 
             E_1D = self.pdf.Expectations[term]['1D']['w']/np.sqrt(Ra)
             E_2D = self.pdf.Expectations[term]['2D']['wz']/np.sqrt(Ra)
-            twin_00.set_ylabel(r'$E\{ |\nabla W|^2 | w \}/Re$', color="b")
+            twin_00.set_ylabel(r'$E\{ |\nabla W|^2 | w \}/Re$', color="b", fontsize=30)
 
         elif term == r'\partial_z P': 
             E_1D = -1.*self.pdf.Expectations[term]['1D']['w']
             E_2D = -1.*self.pdf.Expectations[term]['2D']['wz']
-            twin_00.set_ylabel(r'$-E\{ \partial_z P | w \}$', color="b")
+            twin_00.set_ylabel(r'$-E\{ \partial_z P | w \}$', color="b", fontsize=30)
 
         elif term == r'B':   
             E_1D = self.pdf.Expectations[term]['1D']['w']
             E_2D = self.pdf.Expectations[term]['2D']['wz']
-            twin_00.set_ylabel(r'$E\{ B | w \}$', color="b")
+            twin_00.set_ylabel(r'$E\{ B | w \}$', color="b", fontsize=30)
 
         elif term == 'both':
             E_1D = self.pdf.Expectations[r'B']['1D']['w'] - self.pdf.Expectations['\partial_z P']['1D']['w']
             E_2D = self.pdf.Expectations[r'B']['2D']['wz'] - self.pdf.Expectations['\partial_z P']['2D']['wz']
-            twin_00.set_ylabel(r'$E\{ B - \partial_z P | w \}$', color="b")
+            twin_00.set_ylabel(r'$E\{ B - \partial_z P | w \}$', color="b", fontsize=30)
 
         # plot 1D Expectation 
         twin_00.plot(self.pdf.w[w_idx], E_1D[w_idx], 'b-')
@@ -412,8 +416,8 @@ class PdfPlotter(object):
 
         # Make the 'main' 2D plot
         axTemperature.contourf(x, y, f_xy.T, cmap='Reds', levels=Nlevels, norm=norm)
-        axTemperature.set_xlabel(xlabel,fontsize=25)
-        axTemperature.set_ylabel(ylabel,fontsize=25)
+        axTemperature.set_xlabel(xlabel,fontsize=30)
+        axTemperature.set_ylabel(ylabel,fontsize=30)
 
         #Make the tickmarks pretty
         ticklabels = axTemperature.get_xticklabels()
@@ -439,8 +443,8 @@ class PdfPlotter(object):
         axHisty.set_xlim([0.,1.01*max(f_y)])
         axHisty.fill_between(x=f_y,y1=y,color= "r",alpha= 0.2)
         
-        axHistx.set_ylabel(fxlabel,fontsize=25)
-        axHisty.set_xlabel(fylabel,fontsize=25)
+        axHistx.set_ylabel(fxlabel,fontsize=30)
+        axHisty.set_xlabel(fylabel,fontsize=30)
 
         #Set up the histogram limits
         axHistx.set_xlim( min(x), max(x) )
@@ -449,13 +453,13 @@ class PdfPlotter(object):
         #Make the tickmarks pretty
         ticklabels = axHistx.get_yticklabels()
         for label in ticklabels:
-            label.set_fontsize(20)
+            label.set_fontsize(30)
             label.set_family('serif')
         
         #Make the tickmarks pretty
         ticklabels = axHisty.get_xticklabels()
         for label in ticklabels:
-            label.set_fontsize(20)
+            label.set_fontsize(30)
             label.set_family('serif')
         
         #Cool trick that changes the number of tickmarks for the histogram axes
@@ -528,35 +532,35 @@ class PdfPlotter(object):
             
             twin_x = axHistx.twinx()
             twin_x.plot(x,f_x, 'b-.')
-            twin_x.set_ylabel(r'$E\{-|w\}$',color="b",fontsize=20);
+            twin_x.set_ylabel(r'$E\{-|w\}$',color="b",fontsize=30);
             twin_x.tick_params(axis="y",labelcolor="b")
 
             twin_y = axHisty.twiny()
             twin_y.plot(f_y, y, 'b-.')
-            twin_y.set_xlabel(r'$E\{-|b\}$',color="b",fontsize=20);
+            twin_y.set_xlabel(r'$E\{-|b\}$',color="b",fontsize=30);
             twin_y.tick_params(axis="x",labelcolor="b")
 
         else:
             twin_x = axHistx.twinx()
             twin_x.plot(x,f_x, 'b-.')
-            twin_x.set_ylabel(r'$E\{-|w\}/Re$',color="b",fontsize=20);
+            twin_x.set_ylabel(r'$E\{-|w\}$',color="b",fontsize=30);
             twin_x.tick_params(axis="y",labelcolor="b")
 
             twin_y = axHisty.twiny()
             twin_y.plot(f_y, y, 'b-.')
-            twin_y.set_xlabel(r'$E\{-|b\}/Re$',color="b",fontsize=20);
+            twin_y.set_xlabel(r'$E\{-|b\}$',color="b",fontsize=30);
             twin_y.tick_params(axis="x",labelcolor="b")
 
         #Make the tickmarks pretty
         ticklabels = twin_x.get_yticklabels()
         for label in ticklabels:
-            label.set_fontsize(20)
+            label.set_fontsize(30)
             label.set_family('serif')
         
         #Make the tickmarks pretty
         ticklabels = twin_y.get_xticklabels()
         for label in ticklabels:
-            label.set_fontsize(20)
+            label.set_fontsize(30)
             label.set_family('serif')
         
         #Cool trick that changes the number of tickmarks for the histogram axes
@@ -572,6 +576,8 @@ class PdfPlotter(object):
 
 if __name__ == "__main__":
 
+    intervals = {'IC':{'w':(-0.05,0.05),'b':(0.004,0.008)}, 'ICR':{'w':(-0.05,0.05),'b':(0.004,0.008)}, 'RBC':{'w':(-1,1),'b':(0.4,0.6)}, 
+                 'PLUME':{'w':(-0.1,0.1),'b':(-0.01,0.01)}, 'SINE':{'w':(-.5,.5),'b':(0.05,.25)}, 'STEP':{'w':(-1,1),'b':(0.2,.8)}}
 
     # Generate all the plots in the Appendix
     for file in glob.glob("./data/*.pickle"):
@@ -584,7 +590,7 @@ if __name__ == "__main__":
             
             os.chdir(name)
             pdf = pickle.load(f)
-            plotter = PdfPlotter(pdf)
+            plotter = PdfPlotter(pdf, interval=intervals[name])
             plotter.plot_pdf(figname='pdf_'+name+'.png')
             for key,save in zip(pdf.Expectations.keys(),pdf.Save_Handles):
                 plotter.plot_expectation(term=key, figname=save+'.png', Nlevels=25, sigma_smooth=3)
