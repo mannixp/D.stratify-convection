@@ -48,9 +48,9 @@ class PdfGenerator(object):
         self.fBZ = np.zeros((self.N,self.N))
 
         # Expectations -----------------
-        self.Plot_Titles = [r'$E\{∂z P |Y = y\}$',r'E\{ |∂xB|^2 + |∂zB|^2 |Y = y}',r'$E\{ (∂xB)(∂xW ) + (∂z B)(∂z W ) | Y = y \}$',r'$E\{ |∂xW|^2 + |∂zW|^2 |Y = y\}$',r'$E\{B|Y=y\}']
-        self.Save_Handles = ['dz Pressure','Grad buoyancy squared','Cross Grad Buoyancy Velocity','Grad velocity squared', 'Buoyancy']
-        self.Expectations = {r'\partial_z P':{},r'\|\nabla B\|^2':{},r'\nabla W^T \nabla B':{},r'\|\nabla W \|^2':{}, r'B':{}}
+        self.Plot_Titles = [r'$E\{∂z P |Y = y\}$',r'E\{ |∂xB|^2 + |∂zB|^2 |Y = y}',r'$E\{ (∂xB)(∂xW ) + (∂z B)(∂z W ) | Y = y \}$',r'$E\{ |∂xW|^2 + |∂zW|^2 |Y = y\}$',r'$E\{B|Y=y\}',r'$E\{W|Y=y\}']
+        self.Save_Handles = ['dz Pressure','Grad buoyancy squared','Cross Grad Buoyancy Velocity','Grad velocity squared', 'Buoyancy', 'Velocity']
+        self.Expectations = {r'\partial_z P':{},r'\|\nabla B\|^2':{},r'\nabla W^T \nabla B':{},r'\|\nabla W \|^2':{}, r'B':{}, r'W':{}}
 
         for key,_ in self.Expectations.items():
     
@@ -179,7 +179,7 @@ class PdfGenerator(object):
         print('------  Generating Conditional Expectations ------- \n ')
 
         W,B,Z,  dPGrad,B2Grad,WBGrad,W2Grad = self.data
-        Term_E = [dPGrad,B2Grad,WBGrad,W2Grad,B]
+        Term_E = [dPGrad,B2Grad,WBGrad,W2Grad,B,W]
         Nz = len(self.z)
 
         if not np.any(self.fB):

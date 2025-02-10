@@ -1,4 +1,8 @@
-"""Tests to verify the pdfs, conditional expectations and APE are correctly calculated."""
+"""
+Tests to verify the pdfs, conditional expectations and APE are correctly calculated.
+
+To excute the tests: python3 -m pytest tests/
+"""
 
 from PdfGenerator import PdfGenerator
 import numpy as np
